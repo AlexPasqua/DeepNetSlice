@@ -2,14 +2,14 @@ import reader
 
 
 class Simulator:
-    def __init__(self, psn_file: str, nspr_file: str):
+    def __init__(self, psn_file: str, nsprs_path: str):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
-        :param nspr_file: GraphML file containing the definition of the NSPR
+        :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
         """
-        self.psn = reader.read_psn(graphml_file=psn_file)
-        self.nspr = reader.read_nspr(graphml_file=nspr_file)
+        self.psn = reader.read_psn(graphml_file=psn_file)   # physical substrate network
+        self.nsprs = reader.read_nsprs(nsprs_path=nsprs_path)   # network slice placement requests
 
 
 if __name__ == '__main__':
-    sim = Simulator(psn_file="../PSNs/triangle.graphml", nspr_file="../NSPRs/dummy_NSPR.graphml")
+    sim = Simulator(psn_file="../PSNs/triangle.graphml", nsprs_path="../NSPRs/dummy_NSPR.graphml")

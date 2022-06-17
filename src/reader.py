@@ -1,5 +1,6 @@
+import os
 import networkx as nx
-from typing import Tuple, Dict
+from typing import Tuple, List
 
 
 def _check_if_graphml(file: str):
@@ -70,7 +71,15 @@ def read_psn(graphml_file: str) -> nx.Graph:
     return psn
 
 
-def read_nspr(graphml_file: str) -> nx.Graph:
+def read_single_nspr(graphml_file: str) -> nx.Graph:
+    """ Reads a single NSPR (network slice placement request)
+
+    :param graphml_file: GraphML file with the definition of the NSPR
+    :return: the NSPR as a networkx.Graph object
+
+    :raise ValueError: if "graphml_file" is not a GraphML file
+    :raise AssertionError: if some required attributes of nodes and links are missing
+    """
     _check_if_graphml(graphml_file)  # check if the file passed is a GraphML file
 
     # read the GraphML file and create a nx.Graph object
@@ -81,3 +90,18 @@ def read_nspr(graphml_file: str) -> nx.Graph:
                                required_node_attributes=("reqCPU", "reqRAM"),
                                required_link_attributes=("reqBW",))
     return nspr
+
+
+def read_nsprs(nsprs_path: str) -> List[nx.Graph, ...]:
+    """ Reads all the NSPRs (network slice placement requests) in a directory
+
+    :param nsprs_path: either path to the directory with the files defining a NSPR each or the path to a single NSPR
+    :return: the list of the NSPRs present in the directory (nsprs_path)
+    :raise ValueError: if nsprs_path is neither a directory nor a file
+    """
+    if os.path.isdir(nsprs_path):
+        return [read_single_nspr(graphml_file) for graphml_file in os.listdir(nsprs_path)]
+    elif os.path.isfile(nsprs_path):
+        return [read_single_nspr(nsprs_path)]
+    else:
+        raise ValueError(f"{nsprs_path} is neither a directory nor a file")
