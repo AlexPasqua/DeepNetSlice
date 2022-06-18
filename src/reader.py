@@ -26,6 +26,10 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
         - in case some nodes/links don't contain all the required parameters
         - in case some non admissible values are used for some arguments
     """
+    # check graph
+    if "E2ELatency" in network.graph.keys():
+        assert network.graph['E2ELatency'] > 0
+
     # check nodes
     for node_id, node in network.nodes.items():
         # check that all required attributes are present in the current node
@@ -45,7 +49,7 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
         # check that - if the admissible values for a certain attribute are passed - the value of each attribute is admissible
         for attrib, value in cur_link_attribs_values:
             assert value in admissible_values.get(attrib, (value,))
-            if attrib in ("BWcap", "reqBW"):
+            if attrib in ("BWcap", "reqBW", "Latency", "reqLatency"):
                 assert value >= 0
 
 
@@ -92,7 +96,7 @@ def read_single_nspr(graphml_file: str) -> nx.Graph:
     return nspr
 
 
-def read_nsprs(nsprs_path: str) -> List[nx.Graph, ...]:
+def read_nsprs(nsprs_path: str) -> List[nx.Graph]:
     """ Reads all the NSPRs (network slice placement requests) in a directory
 
     :param nsprs_path: either path to the directory with the files defining a NSPR each or the path to a single NSPR

@@ -10,6 +10,7 @@
 
     <!--  Links' attributes  -->
     <key attr.name="BWcap" attr.type="int" for="edge" id="d5" />
+    <key attr.name="Latency" attr.type="int" for="edge" id="d6" />
 
     <!--  Definition of the graph  -->
     <graph edgedefault="undirected">
@@ -33,12 +34,15 @@
 
         <edge source="0" target="1">
             <data key="d5">100</data>
+            <data key="d6">5</data>
         </edge>
         <edge source="1" target="2">
             <data key="d5">100</data>
+            <data key="d6">5</data>
         </edge>
         <edge source="2" target="0">
             <data key="d5">100</data>
+            <data key="d6">5</data>
         </edge>
     </graph>
 </graphml>

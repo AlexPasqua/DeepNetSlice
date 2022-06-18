@@ -2,39 +2,45 @@
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
     <!--  General attributes  -->
     <key attr.name="Label" attr.type="string" id="d1" />
+    <key attr.name="E2ELatency" attr.type="int" id="d2" />
 
     <!--  Nodes' attributes  -->
-    <key attr.name="reqCPU" attr.type="int" for="node" id="d2" />
-    <key attr.name="reqRAM" attr.type="int" for="node" id="d3" />
+    <key attr.name="reqCPU" attr.type="int" for="node" id="d3" />
+    <key attr.name="reqRAM" attr.type="int" for="node" id="d4" />
 
     <!--  Links' attributes  -->
-    <key attr.name="reqBW" attr.type="int" for="edge" id="d4" />
+    <key attr.name="reqBW" attr.type="int" for="edge" id="d5" />
+    <key attr.name="reqLatency" attr.type="int" for="edge" id="d6" />
 
     <!--  Definition of the graph  -->
     <graph edgedefault="undirected">
         <data key="d1">Triangle</data>
+        <data key="d2">10000</data>
 
         <node id="0">
-            <data key="d2">100</data>
-            <data key="d3">500</data>
+            <data key="d3">100</data>
+            <data key="d4">500</data>
         </node>
         <node id="1">
-            <data key="d2">50</data>
-            <data key="d3">100</data>
+            <data key="d3">50</data>
+            <data key="d4">100</data>
         </node>
         <node id="2">
-            <data key="d2">50</data>
-            <data key="d3">100</data>
+            <data key="d3">50</data>
+            <data key="d4">100</data>
         </node>
 
         <edge source="0" target="1">
-            <data key="d4">100</data>
+            <data key="d5">100</data>
+            <data key="d6">10</data>
         </edge>
         <edge source="1" target="2">
-            <data key="d4">100</data>
+            <data key="d5">100</data>
+            <data key="d6">10</data>
         </edge>
         <edge source="2" target="0">
-            <data key="d4">100</data>
+            <data key="d5">100</data>
+            <data key="d6">10</data>
         </edge>
     </graph>
 </graphml>
