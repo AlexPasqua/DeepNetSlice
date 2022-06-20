@@ -24,15 +24,17 @@ class Simulator:
         for vnf_id, vnf in nspr.nodes.items():
             if vnf['placed'] < 0:   # it means the VNF is not currently placed onto a physical node
                 # select the physical node onto which to place the VNF
-                physical_node = self.decision_maker.decide_next_node(psn=self.psn, vnf=vnf)
-                if physical_node is None:
+                physical_node_id, physical_node = self.decision_maker.decide_next_node(psn=self.psn, vnf=vnf)
+                if physical_node_id == -1:
                     # it wasn't possible to place the VNF onto the PSN --> NSPR rejected
                     return False
 
-                # update the resources capacities of the physical node
-                # vnf['placed'] =
+                # place the VNF and update the resources availabilities of the physical node
+                vnf['placed'] = physical_node_id
                 physical_node['availCPU'] -= vnf['reqCPU']
                 physical_node['availRAM'] -= vnf['reqRAM']
+
+                # TODO: connect the placed VNFs to the other VNFs it's supposed to be connected to
 
     def restore_avail_resources(self, nspr: nx.Graph):
         for vnf_id, vnf in nspr.nodes:
@@ -55,19 +57,6 @@ class Simulator:
             outcome = self.evaluate_nspr(nspr=cur_nspr)
             if not outcome:
                 self.restore_avail_resources(nspr=cur_nspr)
-
-            # place all the VNFs and VLs onto the physical network and update the available resources
-            for vnf_id, vnf in cur_nspr.nodes.items():
-                if not vnf['placed']:
-                    # select the physical node onto which to place the VNF
-                    physical_node = self.decision_maker.decide_next_node(psn=self.psn, vnf=vnf)
-                    if physical_node is None:
-                        # TODO: do something to keep track of the non-placed NSPR
-                        pass
-
-                    # update the resources capacities of the physical node
-                    physical_node['CPUcap'] -= vnf['reqCPU']
-                    physical_node['RAMcap'] -= vnf['reqRAM']
 
             # TODO: check if new NSPRs arrived
 
