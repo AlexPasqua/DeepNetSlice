@@ -35,13 +35,17 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
         # add an attribute to specify if a VNF has been placed onto the PSN (initialized as False)
         if "reqCPU" in node.keys():
             # 'reqCPU' is a mandatory argument for NSPR, so if it's present, the node doesn't belong to a PSN, but to a NSPR
-            node['placed'] = False
+            node['placed'] = -1
+        else:
+            # it means the node belongs to a PSN and not to a NSPR
+            node['availCPU'] = node['CPUcap']
+            node['availRAM'] = node['RAMcap']
         # check that all required attributes are present in the current node
         assert all(req_attrib in node.keys() for req_attrib in required_node_attributes)
         # check that - if the admissible values for a certain attribute are passed - the value of each attribute is admissible
         for attrib, value in node.items():
             assert value in admissible_values.get(attrib, (value,))
-            if attrib in ("CPUcap", "RAMcap", "reqCPU", "reqRAM"):
+            if attrib in ("CPUcap", "RAMcap", "availCPU", "availRAM", "reqCPU", "reqRAM"):
                 assert value >= 0
 
     # check edges

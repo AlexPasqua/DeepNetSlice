@@ -21,9 +21,9 @@ class RandomDecisionMaker(BaseDecisionMaker):
 
         :param psn: a graph representation of the PSN
         :param vnf: a VNF to be placed on the PSN
-        :return:
+        :return: the physical node onto which to place the VNF (if not possible, returns None)
         """
-        psn_nodes_ids = copy.deepcopy(list(psn.nodes))
+        psn_nodes_ids = copy.deepcopy(list(psn.nodes))  # list of the IDs of the nodes in the PSN
         physical_node = psn.nodes[psn_nodes_ids.pop(random.randint(0, len(psn_nodes_ids) - 1))]
         while not self.resources_reqs_satisfied(physical_node, vnf) and len(psn_nodes_ids) > 0:
             physical_node = psn.nodes[psn_nodes_ids.pop(random.randint(0, len(psn_nodes_ids) - 1))]

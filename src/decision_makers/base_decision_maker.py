@@ -15,7 +15,7 @@ class BaseDecisionMaker:
         :param vnf: virtual network function requiring some resources
         :return: True if the resources required by the VNF are available on the physical node, else False
         """
-        if physical_node['CPUcap'] >= vnf['reqCPU'] and physical_node['RAMcap'] >= vnf['reqRAM']:
+        if physical_node['availCPU'] >= vnf['reqCPU'] and physical_node['availRAM'] >= vnf['reqRAM']:
             return True
         return False
 
