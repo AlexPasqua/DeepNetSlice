@@ -16,17 +16,17 @@ class Simulator:
         self.decision_maker = decision_makers.decision_makers[decision_maker_type]
 
     @staticmethod
-    def get_cur_nvf_links(vnf_id: int, nspr: nx.Graph):
+    def get_cur_nvf_links(vnf_id: int, nspr: nx.Graph) -> dict:
         """ Get all the virtual links connected to a specific VNF
 
         :param vnf_id: ID of a VNF whose VLs have to be returned
         :param nspr: the NSPR to which the VNF belongs
-        :return: list of the VLs connected to the specified VNF
+        :return: dict of the VLs connected to the specified VNF
         """
-        vnf_links = []
-        for vl in nspr.edges:
-            if vnf_id in vl:
-                vnf_links.append(vl)
+        vnf_links = {}
+        for extremes, vl in nspr.edges.items():
+            if vnf_id in extremes:
+                vnf_links[extremes] = vl
         return vnf_links
 
     def evaluate_nspr(self, nspr: nx.Graph) -> bool:
@@ -50,26 +50,37 @@ class Simulator:
 
                 # connect the placed VNF to the other VNFs it's supposed to be connected to
                 vnf_links = self.get_cur_nvf_links(vnf_id, nspr)    # get the VLs involving the current VNF
-                for vl in vnf_links:
-                    # TODO: weight edges based on eligibility (resources availability) -> put something in the 'weight' attribute in nx.shortest_path()
-                    psn_path = nx.shortest_path(G=self.psn, source=vl[0], target=vl[1], weight=None, method='dijkstra')
+                for (source, target), vl in vnf_links.items():
+                    if not nspr.edges[source, target]['placed']:
+                        # TODO: weight edges based on eligibility (resources availability) -> put something in the 'weight' attribute in nx.shortest_path()
+                        psn_path = nx.shortest_path(G=self.psn, source=source, target=target, weight=None, method='dijkstra')
 
-                    # place the VL onto the PSN and update the resources availabilities of the physical links involved
-                    reqBW = nspr.edges[vl[0], vl[1]]['reqBW']
-                    for i in range(len(psn_path) - 1):
-                        self.psn.edges[psn_path[i], psn_path[i+1]]['availBW'] -= reqBW
-                    nspr.edges[vl[0], vl[1]]['placed'] = psn_path
+                        # place the VL onto the PSN and update the resources availabilities of the physical links involved
+                        reqBW = nspr.edges[source, target]['reqBW']
+                        for i in range(len(psn_path) - 1):
+                            physical_link = self.psn.edges[psn_path[i], psn_path[i+1]]
+                            physical_link['availBW'] -= reqBW
+                        nspr.edges[source, target]['placed'] = psn_path
 
     def restore_avail_resources(self, nspr: nx.Graph):
+        """ Method called in case a NSPR is not accepted.
+        Restores the resources if the PSN that had been already allocated for the rejected NSPR
+
+        :param nspr: the rejected NSPR
+        """
         for vnf_id, vnf in nspr.nodes.items():
             # restore nodes' resources availabilities
             if vnf['placed'] >= 0:
                 physical_node = self.psn.nodes[vnf['placed']]
                 physical_node['availCPU'] += vnf['reqCPU']
                 physical_node['availRAM'] += vnf['reqRAM']
-        for vl_id, vl in nspr.edges:
+        for _, vl in nspr.edges.items():
             # restore links' resources availabilities
-            raise NotImplementedError
+            if vl['placed']:
+                # if vl['placed'] is not empty, it's the list of the physical nodes traversed by the link
+                for i in range(len(vl['placed']) - 1):
+                    physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i+1]]
+                    physical_link['availBW'] += vl['reqBW']
 
     def start(self, sim_steps: int = 100):
         for step in range(sim_steps):
