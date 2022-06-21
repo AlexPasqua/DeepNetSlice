@@ -34,7 +34,7 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
     for node_id, node in network.nodes.items():
         # add an attribute to specify if a VNF has been placed onto the PSN (initialized as False)
         if "reqCPU" in node.keys():
-            # 'reqCPU' is a mandatory argument for NSPR, so if it's present, the node doesn't belong to a PSN, but to a NSPR
+            # 'reqCPU' is a mandatory argument for NSPR, so if it's present, the node is a VNF
             node['placed'] = -1
         else:
             # it means the node belongs to a PSN and not to a NSPR
@@ -61,7 +61,11 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
             if attrib in ("BWcap", "reqBW", "Latency", "reqLatency"):
                 assert value >= 0
         # initialize resources availabilities if PSN
-        if "BWcap" in cur_link_attribs:
+        if "reqBW" in cur_link_attribs:
+            # 'reqBW' is a mandatory argument for NSPR, so if it's present, the link is a VL
+            network.edges[node_A, node_B]['placed'] = []
+        else:
+            # it means the link is physical and belongs to a PSN (and not to a NSPR)
             network.edges[node_A, node_B]['availBW'] = network.edges[node_A, node_B]['BWcap']
 
 

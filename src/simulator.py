@@ -62,10 +62,13 @@ class Simulator:
 
     def restore_avail_resources(self, nspr: nx.Graph):
         for vnf_id, vnf in nspr.nodes.items():
-            # TODO: restore nodes' resources availabilities
-            raise NotImplementedError
-        for link_id, link in nspr.edges:
-            # TODO: restore links' resources availabilities
+            # restore nodes' resources availabilities
+            if vnf['placed'] >= 0:
+                physical_node = self.psn.nodes[vnf['placed']]
+                physical_node['availCPU'] += vnf['reqCPU']
+                physical_node['availRAM'] += vnf['reqRAM']
+        for vl_id, vl in nspr.edges:
+            # restore links' resources availabilities
             raise NotImplementedError
 
     def start(self, sim_steps: int = 100):
