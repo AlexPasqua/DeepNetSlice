@@ -15,6 +15,20 @@ class Simulator:
         self.nsprs: list = reader.read_nsprs(nsprs_path=nsprs_path)  # network slice placement requests
         self.decision_maker = decision_makers.decision_makers[decision_maker_type]
 
+    @staticmethod
+    def get_cur_nvf_links(vnf_id: int, nspr: nx.Graph):
+        """ Get all the virtual links connected to a specific VNF
+
+        :param vnf_id: ID of a VNF whose VLs have to be returned
+        :param nspr: the NSPR to which the VNF belongs
+        :return: list of the VLs connected to the specified VNF
+        """
+        vnf_links = []
+        for vl in nspr.edges:
+            if vnf_id in vl:
+                vnf_links.append(vl)
+        return vnf_links
+
     def evaluate_nspr(self, nspr: nx.Graph) -> bool:
         """ Place all the VNFs and VLs onto the physical network and update the available resources
 
@@ -34,10 +48,20 @@ class Simulator:
                 physical_node['availCPU'] -= vnf['reqCPU']
                 physical_node['availRAM'] -= vnf['reqRAM']
 
-                # TODO: connect the placed VNFs to the other VNFs it's supposed to be connected to
+                # connect the placed VNF to the other VNFs it's supposed to be connected to
+                vnf_links = self.get_cur_nvf_links(vnf_id, nspr)    # get the VLs involving the current VNF
+                for vl in vnf_links:
+                    # TODO: weight edges based on eligibility (resources availability) -> put something in the 'weight' attribute in nx.shortest_path()
+                    psn_path = nx.shortest_path(G=self.psn, source=vl[0], target=vl[1], weight=None, method='dijkstra')
+
+                    # place the VL onto the PSN and update the resources availabilities of the physical links involved
+                    reqBW = nspr.edges[vl[0], vl[1]]['reqBW']
+                    for i in range(len(psn_path) - 1):
+                        self.psn.edges[psn_path[i], psn_path[i+1]]['availBW'] -= reqBW
+                    nspr.edges[vl[0], vl[1]]['placed'] = psn_path
 
     def restore_avail_resources(self, nspr: nx.Graph):
-        for vnf_id, vnf in nspr.nodes:
+        for vnf_id, vnf in nspr.nodes.items():
             # TODO: restore nodes' resources availabilities
             raise NotImplementedError
         for link_id, link in nspr.edges:

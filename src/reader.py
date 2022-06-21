@@ -60,6 +60,9 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
             assert value in admissible_values.get(attrib, (value,))
             if attrib in ("BWcap", "reqBW", "Latency", "reqLatency"):
                 assert value >= 0
+        # initialize resources availabilities if PSN
+        if "BWcap" in cur_link_attribs:
+            network.edges[node_A, node_B]['availBW'] = network.edges[node_A, node_B]['BWcap']
 
 
 def read_psn(graphml_file: str) -> nx.Graph:
