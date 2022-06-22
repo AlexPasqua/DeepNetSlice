@@ -1,6 +1,6 @@
 import os
 import networkx as nx
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 
 def _check_if_graphml(file: str):
@@ -29,6 +29,11 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
     # check graph
     if "E2ELatency" in network.graph.keys():
         assert network.graph['E2ELatency'] > 0
+        # if E2ELatency is present, it means the network is a NSPR
+        if "ArrivalTime" in network.graph.keys():
+            assert network.graph['ArrivalTime'] >= 0
+        else:
+            network.graph['ArrivalTime'] = 0
 
     # check nodes
     for node_id, node in network.nodes.items():
@@ -112,16 +117,25 @@ def read_single_nspr(graphml_file: str) -> nx.Graph:
     return nspr
 
 
-def read_nsprs(nsprs_path: str) -> List[nx.Graph]:
+def read_nsprs(nsprs_path: str) -> Dict[int, List[nx.Graph]]:
     """ Reads all the NSPRs (network slice placement requests) in a directory
 
     :param nsprs_path: either path to the directory with the files defining a NSPR each or the path to a single NSPR
-    :return: the list of the NSPRs present in the directory (nsprs_path)
+    :return: a dict having as keys the various arrival times of the NSPRs and as values the NSPRs themselves
     :raise ValueError: if nsprs_path is neither a directory nor a file
     """
-    if os.path.isdir(nsprs_path):
-        return [read_single_nspr(graphml_file) for graphml_file in os.listdir(nsprs_path)]
-    elif os.path.isfile(nsprs_path):
-        return [read_single_nspr(nsprs_path)]
-    else:
+    if not os.path.isdir(nsprs_path) and not os.path.isfile(nsprs_path):
         raise ValueError(f"{nsprs_path} is neither a directory nor a file")
+
+    # if nspr_path is a file, get the path of its directory
+    dir_path = os.path.split(nsprs_path)[0] if os.path.isfile(nsprs_path) else nsprs_path
+
+    # save the NSPRs in a dict with the arrival times as keys
+    nspr_dict = {}
+    for graphml_file in os.listdir(dir_path):
+        nspr = read_single_nspr(os.path.join(nsprs_path, graphml_file))
+        if nspr.graph['ArrivalTime'] not in nspr_dict.keys():
+            nspr_dict[nspr.graph['ArrivalTime']] = [nspr]
+        else:
+            nspr_dict[nspr.graph['ArrivalTime']].append(nspr)
+    return nspr_dict
