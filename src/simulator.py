@@ -1,3 +1,5 @@
+import math
+
 import networkx as nx
 
 import decision_makers
@@ -21,6 +23,7 @@ class Simulator:
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs = reader.read_nsprs(nsprs_path=nsprs_path)  # network slice placement requests
         self.decision_maker = decision_makers.decision_makers[decision_maker_type]
+        self.reqBW = 0  # attribute needed in method self.compute_link_weight
 
     @staticmethod
     def get_cur_nvf_links(vnf_id: int, nspr: nx.Graph) -> dict:
@@ -35,6 +38,21 @@ class Simulator:
             if vnf_id in extremes:
                 vnf_links[extremes] = vl
         return vnf_links
+
+    def compute_link_weight(self, source: int, target: int, link: dict):
+        """ Compute the weight of an edge between two nodes.
+        If the edge satisfies the bandwidth requirement, the weight is 1, else infinity.
+
+        This method is passed to networkx's shortest_path function as a weight function, and it's subject to networkx's API.
+        It must take exactly 3 arguments: the two endpoints of an edge and the dictionary of edge attributes for that edge.
+        We need the required bandwidth to compute an edge's weight, so we save it into an attribute of the simulator (self.reqBW).
+
+        :param source: source node in the PSN
+        :param target: target node in the PSN
+        :param link: dict of the link's (source - target) attributes
+        :return: the weight of that link
+        """
+        return 1 if link['availBW'] >= self.reqBW else math.inf
 
     def evaluate_nspr(self, nspr: nx.Graph) -> bool:
         """ Place all the VNFs and VLs onto the physical network and update the available resources
@@ -63,8 +81,9 @@ class Simulator:
 
                     # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
                     if not vl['placed'] and source_node >= 0 and target_node >= 0:
-                        # TODO: weight edges based on eligibility (resources availability) -> put something in the 'weight' attribute in nx.shortest_path()
-                        psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node, weight=None, method='dijkstra')
+                        self.reqBW = vl['reqBW']
+                        psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
+                                                    weight=self.compute_link_weight, method='dijkstra')
 
                         # place the VL onto the PSN and update the resources availabilities of the physical links involved
                         for i in range(len(psn_path) - 1):
