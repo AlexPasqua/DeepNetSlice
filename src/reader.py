@@ -1,6 +1,7 @@
 import os
-import networkx as nx
 from typing import Tuple, List, Dict
+
+import networkx as nx
 
 
 def _check_if_graphml(file: str):

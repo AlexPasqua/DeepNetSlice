@@ -1,7 +1,7 @@
 import networkx as nx
 
-import reader
 import decision_makers
+import reader
 
 
 class Simulator:
@@ -56,18 +56,21 @@ class Simulator:
                 physical_node['availRAM'] -= vnf['reqRAM']
 
                 # connect the placed VNF to the other VNFs it's supposed to be connected to
-                vnf_links = self.get_cur_nvf_links(vnf_id, nspr)    # get the VLs involving the current VNF
-                for (source, target), vl in vnf_links.items():
-                    if not vl['placed']:
+                cur_vnf_VLs = self.get_cur_nvf_links(vnf_id, nspr)    # get the VLs involving the current VNF
+                for (source_vnf, target_vnf), vl in cur_vnf_VLs.items():
+                    # get the physical nodes where the source and target VNFs are placed
+                    source_node, target_node = nspr.nodes[source_vnf]['placed'], nspr.nodes[target_vnf]['placed']
+
+                    # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
+                    if not vl['placed'] and source_node >= 0 and target_node >= 0:
                         # TODO: weight edges based on eligibility (resources availability) -> put something in the 'weight' attribute in nx.shortest_path()
-                        psn_path = nx.shortest_path(G=self.psn, source=source, target=target, weight=None, method='dijkstra')
+                        psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node, weight=None, method='dijkstra')
 
                         # place the VL onto the PSN and update the resources availabilities of the physical links involved
-                        reqBW = nspr.edges[source, target]['reqBW']
                         for i in range(len(psn_path) - 1):
                             physical_link = self.psn.edges[psn_path[i], psn_path[i+1]]
-                            physical_link['availBW'] -= reqBW
-                        nspr.edges[source, target]['placed'] = psn_path
+                            physical_link['availBW'] -= vl['reqBW']
+                        vl['placed'] = psn_path
 
     def restore_avail_resources(self, nspr: nx.Graph):
         """ Method called in case a NSPR is not accepted.

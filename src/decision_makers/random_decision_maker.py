@@ -1,7 +1,7 @@
-import copy
 import random
+from typing import Tuple
+
 import networkx as nx
-from typing import Union, Tuple
 
 from .base_decision_maker import BaseDecisionMaker
 
@@ -11,6 +11,7 @@ class RandomDecisionMaker(BaseDecisionMaker):
     Random decision maker: when deciding a physical node where to place a VNF,
     it chooses one at random that satisfies the resources requirements
     """
+
     def __init__(self):
         super().__init__()
 
