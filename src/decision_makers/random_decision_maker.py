@@ -23,11 +23,11 @@ class RandomDecisionMaker(BaseDecisionMaker):
         :param vnf: a VNF to be placed on the PSN
         :return: the ID and the physical node itself onto which to place the VNF (if not possible, returns -1, {})
         """
-        psn_nodes_ids = copy.deepcopy(list(psn.nodes))  # list of the IDs of the nodes in the PSN
-        selected_id = psn_nodes_ids.pop(random.randint(0, len(psn_nodes_ids) - 1))
-        while not self.resources_reqs_satisfied(psn.nodes[selected_id], vnf) and len(psn_nodes_ids) > 0:
-            selected_id = psn_nodes_ids.pop(random.randint(0, len(psn_nodes_ids) - 1))
-            if len(psn_nodes_ids) == 0:
+        psn_servers_ids = [node_id for node_id, node in psn.nodes.items() if node['NodeType'] == "server"]
+        selected_id = psn_servers_ids.pop(random.randint(0, len(psn_servers_ids) - 1))
+        while not self.resources_reqs_satisfied(psn.nodes[selected_id], vnf) and len(psn_servers_ids) > 0:
+            selected_id = psn_servers_ids.pop(random.randint(0, len(psn_servers_ids) - 1))
+            if len(psn_servers_ids) == 0:
                 # no physical nodes satisfy the resources requirements --> fail to accept NSPR
                 return -1, {}
         return selected_id, psn.nodes[selected_id]

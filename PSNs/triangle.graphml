@@ -17,17 +17,17 @@
         <data key="d1">Triangle</data>
 
         <node id="0">
-            <data key="d2">UAP</data>
+            <data key="d2">server</data>
             <data key="d3">100</data>
             <data key="d4">500</data>
         </node>
         <node id="1">
-            <data key="d2">router</data>
+            <data key="d2">server</data>
             <data key="d3">50</data>
             <data key="d4">100</data>
         </node>
         <node id="2">
-            <data key="d2">router</data>
+            <data key="d2">server</data>
             <data key="d3">50</data>
             <data key="d4">100</data>
         </node>
