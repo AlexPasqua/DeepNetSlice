@@ -80,12 +80,14 @@ class Simulator:
                     source_node, target_node = nspr.nodes[source_vnf]['placed'], nspr.nodes[target_vnf]['placed']
 
                     # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
+                    # NOTE: this 'if' and its body already take care of connected VNFs placed on the same physical node
                     if not vl['placed'] and source_node >= 0 and target_node >= 0:
                         self.reqBW = vl['reqBW']
                         psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
                                                     weight=self.compute_link_weight, method='dijkstra')
 
                         # place the VL onto the PSN and update the resources availabilities of the physical links involved
+                        # in case the VNFs are placed on the same physical node, this 'if' is not executed
                         for i in range(len(psn_path) - 1):
                             physical_link = self.psn.edges[psn_path[i], psn_path[i+1]]
                             physical_link['availBW'] -= vl['reqBW']
