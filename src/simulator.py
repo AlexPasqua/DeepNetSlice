@@ -1,7 +1,10 @@
 import math
+import sys
+
 import gym
 
 import networkx as nx
+import numpy as np
 
 import decision_makers
 import reader
@@ -15,6 +18,7 @@ class Simulator(gym.Env):
         nsprs (dict): dict of NSPRs associated to their arrival time
         decision_maker (DecisionMaker): decision maker used to decide the next VNF to place onto the PSN
     """
+
     def __init__(self, psn_file: str, nsprs_path: str, decision_maker_type: str):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
@@ -26,33 +30,116 @@ class Simulator(gym.Env):
         self.decision_maker = decision_makers.decision_makers[decision_maker_type]
         self.reqBW = 0  # attribute needed in method self.compute_link_weight
 
+        # map (dict) between IDs of physical nodes and their respective index (see self._init_map_id_idx's docstring)
+        self._map_id_idx = self._init_map_id_idx()
+
         # gym.Env required attributes
-        self.action_space = gym.spaces.Discrete(len(self.psn.nodes))
+        ONE_BILLION = 1000000000    # constant for readability
+        n_nodes = len(self.psn.nodes)
+        self.action_space = gym.spaces.Discrete(n_nodes)
+        self.observation_space = gym.spaces.Dict({})
         self.observation_space = gym.spaces.Dict({
             'psn_state': gym.spaces.Dict({
-                'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
-                'ram_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
+                'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+                'ram_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
                 # for each physical node, sum of the BW of the physical links connected to it
-                'bw_capacity_per_node': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
+                'bw_capacity_per_node': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
                 # for each physical node, number of VNFs of the current NSPR placed on it
-                'placement_state': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
+                'placement_state': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
             }),
             'nspr_state': gym.spaces.Dict({
-                'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=math.inf, shape=(1,)),
-                'cur_vnf_ram_req': gym.spaces.Box(low=0, high=math.inf, shape=(1,)),
+                # note: apparently it's not possible to pass "math.inf" or "sys.maxsize" as a gym.spaces.Box's high value
+                'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+                'cur_vnf_ram_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
                 # sum of the required BW of each VL connected to the current VNF
-                'cur_vnf_bw_req': gym.spaces.Box(low=0, high=math.inf, shape=(1,)),
-                'vnfs_still_to_place': gym.spaces.Box(low=0, high=math.inf, shape=(1,), dtype=int),
+                'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+                'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
             })
         })
 
+    # def _get_max_vnfs_in_nspr(self):
+    #     """ Auxiliary method to get the maximum number of VNFs that a single NSPR contains.
+    #     Used to initialized the placement state in the observation space of the environment.
+    #     """
+    #     max_vnfs_in_nspr = 0
+    #     for arrival_time, cur_vnfs in self.nsprs.items():
+    #         for vnf in cur_vnfs:
+    #             if len(vnf.nodes) > max_vnfs_in_nspr:
+    #                 max_vnfs_in_nspr = len(vnf.nodes)
+    #     return max_vnfs_in_nspr
+
+    def _init_map_id_idx(self):
+        """ Method used to initialize a map between the IDs of the physical node and an integer,
+        such that a bunch of N IDs gets mapped to a bunch of N successive integers from 0 to N-1.
+        e.g. IDs: 0, 1, 3, 9 -> IDs_map: 0:0, 1:1, 3:2, 9:3.
+        This is used because the simulator needs to have some lists where each element corresponds to a node,
+        so we need a way to know which index corresponds to which node.
+
+        :return: dict mapping the IDs to the corresponding integer
+        """
+        ids_map = {}
+        idx = 0
+        for node_id, node in self.psn.nodes.items():
+            ids_map[node_id] = idx
+            idx += 1
+        return ids_map
+
+    def _get_observation(self, reset=False):
+        """ Method used to get the observation of the environment.
+
+        :param reset: if True, the observation is the reset state of the environment
+
+        :return: an instance of an observation from the environment
+        """
+        # initialize lists
+        cpu_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        ram_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        bw_capacity_per_node = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        placement_state = np.zeros(len(self.psn.nodes), dtype=int)
+
+        # scan all nodes and save data in lists
+        for node_id, node in self.psn.nodes.items():
+            cpu_capacities[self._map_id_idx[node_id]] = node['CPUcap']
+            ram_capacities[self._map_id_idx[node_id]] = node['RAMcap']
+            for extremes, link in self.psn.edges.items():
+                if node_id in extremes:
+                    bw_capacity_per_node[self._map_id_idx[node_id]] += link['availBW']
+
+        if reset:
+            # if this method is called form the reset method, set this part of the observation with zeros
+            nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
+                          'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
+        else:
+            # if this method is called form the step method
+            # TODO: implement here (the following dict is a placeholder)
+            nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
+                          'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
+            # raise NotImplementedError
+            pass
+
+        return {
+            'psn_state': {
+                'cpu_capacities': cpu_capacities,
+                'ram_capacities': ram_capacities,
+                'bw_capacity_per_node': bw_capacity_per_node,
+                'placement_state': placement_state,
+            },
+            'nspr_state': nspr_state
+        }
+
     def reset(self):
-        # TODO: implement the method
-        return 0
+        """ Method used to reset the environment
+
+        :return: the starting/initial observation of the environment
+        """
+        return self._get_observation(reset=True)
 
     def step(self, action):
         # TODO: implement the method
-        return 0
+        reward = 0
+        done = False
+        info = {}
+        return self._get_observation(reset=False), reward, done, info
 
     @staticmethod
     def get_cur_nvf_links(vnf_id: int, nspr: nx.Graph) -> dict:
@@ -90,7 +177,7 @@ class Simulator(gym.Env):
         :return: True if the NSPR is accepted and placed on the PSN, else False
         """
         for vnf_id, vnf in nspr.nodes.items():
-            if vnf['placed'] < 0:   # it means the VNF is not currently placed onto a physical node
+            if vnf['placed'] < 0:  # it means the VNF is not currently placed onto a physical node
                 # select the physical node onto which to place the VNF
                 physical_node_id, physical_node = self.decision_maker.decide_next_node(psn=self.psn, vnf=vnf)
                 if physical_node_id == -1:
@@ -103,7 +190,7 @@ class Simulator(gym.Env):
                 physical_node['availRAM'] -= vnf['reqRAM']
 
                 # connect the placed VNF to the other VNFs it's supposed to be connected to
-                cur_vnf_VLs = self.get_cur_nvf_links(vnf_id, nspr)    # get the VLs involving the current VNF
+                cur_vnf_VLs = self.get_cur_nvf_links(vnf_id, nspr)  # get the VLs involving the current VNF
                 for (source_vnf, target_vnf), vl in cur_vnf_VLs.items():
                     # get the physical nodes where the source and target VNFs are placed
                     source_node, target_node = nspr.nodes[source_vnf]['placed'], nspr.nodes[target_vnf]['placed']
@@ -116,7 +203,7 @@ class Simulator(gym.Env):
 
                         # place the VL onto the PSN and update the resources availabilities of the physical links involved
                         for i in range(len(psn_path) - 1):
-                            physical_link = self.psn.edges[psn_path[i], psn_path[i+1]]
+                            physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
                             physical_link['availBW'] -= vl['reqBW']
                         vl['placed'] = psn_path
 
@@ -137,7 +224,7 @@ class Simulator(gym.Env):
             if vl['placed']:
                 # if vl['placed'] is not empty, it's the list of the physical nodes traversed by the link
                 for i in range(len(vl['placed']) - 1):
-                    physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i+1]]
+                    physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
                     physical_link['availBW'] += vl['reqBW']
 
     def start(self, sim_steps: int = 100):
