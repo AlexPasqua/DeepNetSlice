@@ -1,4 +1,5 @@
 import math
+import gym
 
 import networkx as nx
 
@@ -6,8 +7,8 @@ import decision_makers
 import reader
 
 
-class Simulator:
-    """ Class implementing the network simulator
+class Simulator(gym.Env):
+    """ Class implementing the network simulator (RL environment)
 
     Attributes:
         psn (nx.Graph): physical substrate network
@@ -24,6 +25,34 @@ class Simulator:
         self.nsprs = reader.read_nsprs(nsprs_path=nsprs_path)  # network slice placement requests
         self.decision_maker = decision_makers.decision_makers[decision_maker_type]
         self.reqBW = 0  # attribute needed in method self.compute_link_weight
+
+        # gym.Env required attributes
+        self.action_space = gym.spaces.Discrete(len(self.psn.nodes))
+        self.observation_space = gym.spaces.Dict({
+            'psn_state': gym.spaces.Dict({
+                'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
+                'ram_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
+                # for each physical node, sum of the BW of the physical links connected to it
+                'bw_capacity_per_node': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
+                # for each physical node, number of VNFs of the current NSPR placed on it
+                'placement_state': gym.spaces.Box(low=0, high=math.inf, shape=(len(self.psn.nodes),)),
+            }),
+            'nspr_state': gym.spaces.Dict({
+                'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=math.inf, shape=(1,)),
+                'cur_vnf_ram_req': gym.spaces.Box(low=0, high=math.inf, shape=(1,)),
+                # sum of the required BW of each VL connected to the current VNF
+                'cur_vnf_bw_req': gym.spaces.Box(low=0, high=math.inf, shape=(1,)),
+                'vnfs_still_to_place': gym.spaces.Box(low=0, high=math.inf, shape=(1,), dtype=int),
+            })
+        })
+
+    def reset(self):
+        # TODO: implement the method
+        return 0
+
+    def step(self, action):
+        # TODO: implement the method
+        return 0
 
     @staticmethod
     def get_cur_nvf_links(vnf_id: int, nspr: nx.Graph) -> dict:
@@ -130,10 +159,3 @@ class Simulator:
             outcome = self.evaluate_nspr(nspr=cur_nspr)
             if not outcome:
                 self.restore_avail_resources(nspr=cur_nspr)
-
-
-if __name__ == '__main__':
-    sim = Simulator(psn_file="../PSNs/triangle.graphml",
-                    nsprs_path="../NSPRs/",
-                    decision_maker_type="random")
-    sim.start()
