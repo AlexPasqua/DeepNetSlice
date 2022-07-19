@@ -6,7 +6,7 @@ import gym
 import networkx as nx
 import numpy as np
 
-import decision_makers
+from decision_makers import decision_makers
 import reader
 
 
@@ -27,17 +27,22 @@ class Simulator(gym.Env):
         """
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs = reader.read_nsprs(nsprs_path=nsprs_path)  # network slice placement requests
-        self.decision_maker = decision_makers.decision_makers[decision_maker_type]
-        self.reqBW = 0  # attribute needed in method self.compute_link_weight
+        self.decision_maker = decision_makers[decision_maker_type]
+        self.cur_nspr = None    # used to keep track of the current NSPR being evaluated
+        self._cur_vl_reqBW = 0  # attribute needed in method 'self.compute_link_weight'
 
-        # map (dict) between IDs of physical nodes and their respective index (see self._init_map_id_idx's docstring)
+        # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
         self._map_id_idx = self._init_map_id_idx()
+
+        # partial rewards to be accumulated across the episodes' steps
+        self._acceptance_reward = 0
+        self._resource_consumption_reward = 0
+        self._load_balancing_reward = 0
 
         # gym.Env required attributes
         ONE_BILLION = 1000000000    # constant for readability
         n_nodes = len(self.psn.nodes)
         self.action_space = gym.spaces.Discrete(n_nodes)
-        self.observation_space = gym.spaces.Dict({})
         self.observation_space = gym.spaces.Dict({
             'psn_state': gym.spaces.Dict({
                 'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
@@ -77,13 +82,13 @@ class Simulator(gym.Env):
 
         :return: dict mapping the IDs to the corresponding integer
         """
-        ids_map = {}
-        idx = 0
+        ids_map, idx = {}, 0
         for node_id, node in self.psn.nodes.items():
             ids_map[node_id] = idx
             idx += 1
         return ids_map
 
+    # TODO: probably remove this method (probabily useless and there are some mistakes)
     def _get_observation(self, reset=False):
         """ Method used to get the observation of the environment.
 
@@ -105,17 +110,9 @@ class Simulator(gym.Env):
                 if node_id in extremes:
                     bw_capacity_per_node[self._map_id_idx[node_id]] += link['availBW']
 
-        if reset:
-            # if this method is called form the reset method, set this part of the observation with zeros
-            nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
-                          'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
-        else:
-            # if this method is called form the step method
-            # TODO: implement here (the following dict is a placeholder)
-            nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
-                          'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
-            # raise NotImplementedError
-            pass
+        # if this method is called form the reset method, set this part of the observation with zeros
+        nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
+                      'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
 
         return {
             'psn_state': {
@@ -132,17 +129,77 @@ class Simulator(gym.Env):
 
         :return: the starting/initial observation of the environment
         """
-        return self._get_observation(reset=True)
+        # reset partial rewards to be accumulated across the episodes' steps
+        self._acceptance_reward = 0
+        self._resource_consumption_reward = 0
+        self._load_balancing_reward = 0
+
+        # initialize lists
+        cpu_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        ram_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        bw_capacity_per_node = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        placement_state = np.zeros(len(self.psn.nodes), dtype=int)
+
+        # scan all nodes and save data in lists
+        for node_id, node in self.psn.nodes.items():
+            cpu_capacities[self._map_id_idx[node_id]] = node['CPUcap']
+            ram_capacities[self._map_id_idx[node_id]] = node['RAMcap']
+            for extremes, link in self.psn.edges.items():
+                if node_id in extremes:
+                    bw_capacity_per_node[self._map_id_idx[node_id]] += link['availBW']
+
+        # if there are NSPRs arriving at time t=0, save the first as current NSPR to be evaluated
+        starting_nsprs = self.nsprs.get(0, [])
+        if starting_nsprs:
+            self.cur_nspr = starting_nsprs[0]
+            cur_nspr_vnfs = list(self.cur_nspr.nodes.keys())
+            cur_vnf_id = cur_nspr_vnfs[0]
+            cur_vnf = self.cur_nspr.nodes[cur_vnf_id]
+            cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=cur_vnf_id, nspr=self.cur_nspr)
+            nspr_state = {'cur_vnf_cpu_req': np.array([cur_vnf['reqCPU']], dtype=int),
+                          'cur_vnf_ram_req': np.array([cur_vnf['reqRAM']], dtype=int),
+                          'cur_vnf_bw_req': np.array([sum(vl['reqBW'] for vl in cur_vnf_vls.values())], dtype=int),
+                          'vnfs_still_to_place': np.array([len(cur_nspr_vnfs)], dtype=int)}
+        else:
+            # there's no NSPR to be evaluated, so set the NSPR state to zeros
+            nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
+                          'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
+
+        return {
+            'psn_state': {
+                'cpu_capacities': cpu_capacities,
+                'ram_capacities': ram_capacities,
+                'bw_capacity_per_node': bw_capacity_per_node,
+                'placement_state': placement_state,
+            },
+            'nspr_state': nspr_state
+        }
 
     def step(self, action):
-        # TODO: implement the method
+        physical_node_id = action
         reward = 0
         done = False
         info = {}
+
+        if physical_node_id < 0:
+            # it wasn't possible to place the VNF
+            self._acceptance_reward = -100
+            done = True
+            self.restore_avail_resources(nspr=self.cur_nspr)
+        else:
+            # place the VNF and update the resources availabilities of the physical node
+            # self.psn.nodes[physical_node_id]['availCPU'] -= self.
+            pass
+
+
+
+        if done:
+            reward = self._acceptance_reward + self._resource_consumption_reward + self._load_balancing_reward
+
         return self._get_observation(reset=False), reward, done, info
 
     @staticmethod
-    def get_cur_nvf_links(vnf_id: int, nspr: nx.Graph) -> dict:
+    def get_cur_vnf_vls(vnf_id: int, nspr: nx.Graph) -> dict:
         """ Get all the virtual links connected to a specific VNF
 
         :param vnf_id: ID of a VNF whose VLs have to be returned
@@ -161,14 +218,14 @@ class Simulator(gym.Env):
 
         This method is passed to networkx's shortest_path function as a weight function, and it's subject to networkx's API.
         It must take exactly 3 arguments: the two endpoints of an edge and the dictionary of edge attributes for that edge.
-        We need the required bandwidth to compute an edge's weight, so we save it into an attribute of the simulator (self.reqBW).
+        We need the required bandwidth to compute an edge's weight, so we save it into an attribute of the simulator (self._cur_vl_reqBW).
 
         :param source: source node in the PSN
         :param target: target node in the PSN
         :param link: dict of the link's (source - target) attributes
         :return: the weight of that link
         """
-        return 1 if link['availBW'] >= self.reqBW else math.inf
+        return 1 if link['availBW'] >= self._cur_vl_reqBW else math.inf
 
     def evaluate_nspr(self, nspr: nx.Graph) -> bool:
         """ Place all the VNFs and VLs onto the physical network and update the available resources
@@ -180,9 +237,7 @@ class Simulator(gym.Env):
             if vnf['placed'] < 0:  # it means the VNF is not currently placed onto a physical node
                 # select the physical node onto which to place the VNF
                 physical_node_id, physical_node = self.decision_maker.decide_next_node(psn=self.psn, vnf=vnf)
-                if physical_node_id == -1:
-                    # it wasn't possible to place the VNF onto the PSN --> NSPR rejected
-                    return False
+                self.step(action=physical_node_id)
 
                 # place the VNF and update the resources availabilities of the physical node
                 vnf['placed'] = physical_node_id
@@ -190,14 +245,14 @@ class Simulator(gym.Env):
                 physical_node['availRAM'] -= vnf['reqRAM']
 
                 # connect the placed VNF to the other VNFs it's supposed to be connected to
-                cur_vnf_VLs = self.get_cur_nvf_links(vnf_id, nspr)  # get the VLs involving the current VNF
+                cur_vnf_VLs = self.get_cur_vnf_vls(vnf_id, nspr)  # get the VLs involving the current VNF
                 for (source_vnf, target_vnf), vl in cur_vnf_VLs.items():
                     # get the physical nodes where the source and target VNFs are placed
                     source_node, target_node = nspr.nodes[source_vnf]['placed'], nspr.nodes[target_vnf]['placed']
 
                     # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
                     if not vl['placed'] and source_node >= 0 and target_node >= 0:
-                        self.reqBW = vl['reqBW']
+                        self._cur_vl_reqBW = vl['reqBW']
                         psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
                                                     weight=self.compute_link_weight, method='dijkstra')
 
