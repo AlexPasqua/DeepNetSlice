@@ -38,6 +38,14 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
 
     # check nodes
     for node_id, node in network.nodes.items():
+        # check that - if the admissible values for a certain attribute are passed - the value of each attribute is admissible
+        for attrib, value in node.items():
+            assert value in admissible_values.get(attrib, (value,))
+            if attrib in ("CPUcap", "RAMcap", "availCPU", "availRAM", "reqCPU", "reqRAM"):
+                assert value >= 0
+        # the following checks are for servers or VNFs only, in case skip
+        if node.get("NodeType", "server") != "server":  # if the node hasn't attribute "NodeType", it's a VNF, so don't skip iteration
+            continue
         # add an attribute to specify if a VNF has been placed onto the PSN (initialized as False)
         if "reqCPU" in node.keys():
             # 'reqCPU' is a mandatory argument for NSPR, so if it's present, the node is a VNF
@@ -48,11 +56,6 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
             node['availRAM'] = node['RAMcap']
         # check that all required attributes are present in the current node
         assert all(req_attrib in node.keys() for req_attrib in required_node_attributes)
-        # check that - if the admissible values for a certain attribute are passed - the value of each attribute is admissible
-        for attrib, value in node.items():
-            assert value in admissible_values.get(attrib, (value,))
-            if attrib in ("CPUcap", "RAMcap", "availCPU", "availRAM", "reqCPU", "reqRAM"):
-                assert value >= 0
 
     # check edges
     for node_A, node_B in list(network.edges):
@@ -134,7 +137,7 @@ def read_nsprs(nsprs_path: str) -> Dict[int, List[nx.Graph]]:
     # save the NSPRs in a dict with the arrival times as keys
     nspr_dict = {}
     for graphml_file in os.listdir(dir_path):
-        nspr = read_single_nspr(os.path.join(nsprs_path, graphml_file))
+        nspr = read_single_nspr(os.path.join(dir_path, graphml_file))
         if nspr.graph['ArrivalTime'] not in nspr_dict.keys():
             nspr_dict[nspr.graph['ArrivalTime']] = [nspr]
         else:
