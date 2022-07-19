@@ -26,11 +26,12 @@ class Simulator(gym.Env):
         :param decision_maker_type: type of decision maker
         """
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
-        self.nsprs = reader.read_nsprs(nsprs_path=nsprs_path)  # network slice placement requests
+        self.nsprs_path = nsprs_path  # path to the directory containing the NSPRs
+        self.nsprs = None   # will be initialized in the reset method
         self.decision_maker = decision_makers[decision_maker_type]
 
         # attributes needed in the method 'step' because it has no access to observations
-        self.cur_nspr = None    # used to keep track of the current NSPR being evaluated
+        self.cur_nspr = None  # used to keep track of the current NSPR being evaluated
         self.cur_nspr_unplaced_vnfs_ids = []  # used to keep track of the VNFs' IDs of the current NSPR that haven't been placed yet
         self.cur_vnf_id = None  # used to keep track of the current VNF being evaluated
 
@@ -40,12 +41,16 @@ class Simulator(gym.Env):
         self._map_id_idx = self._init_map_id_idx()
 
         # partial rewards to be accumulated across the steps of evaluation of a single NSPR
-        self._acceptance_reward = 0
-        self._resource_consumption_reward = 0
-        self._load_balancing_reward = 0
+        self._acceptance_rewards = []
+        self._resource_consumption_rewards = []
+        self._load_balancing_rewards = []
+
+        # reward values for specific outcomes
+        self._rval_accepted_vnf = 100
+        self._rval_rejected_vnf = -100
 
         # Action space and observation space (gym.Env required attributes)
-        ONE_BILLION = 1000000000    # constant for readability
+        ONE_BILLION = 1000000000  # constant for readability
         n_nodes = len(self.psn.nodes)
         self.action_space = gym.spaces.Discrete(n_nodes)
         self.observation_space = gym.spaces.Dict({
@@ -66,17 +71,6 @@ class Simulator(gym.Env):
                 'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
             })
         })
-
-    # def _get_max_vnfs_in_nspr(self):
-    #     """ Auxiliary method to get the maximum number of VNFs that a single NSPR contains.
-    #     Used to initialized the placement state in the observation space of the environment.
-    #     """
-    #     max_vnfs_in_nspr = 0
-    #     for arrival_time, cur_vnfs in self.nsprs.items():
-    #         for vnf in cur_vnfs:
-    #             if len(vnf.nodes) > max_vnfs_in_nspr:
-    #                 max_vnfs_in_nspr = len(vnf.nodes)
-    #     return max_vnfs_in_nspr
 
     def _init_map_id_idx(self):
         """ Method used to initialize a map between the IDs of the physical node and an integer,
@@ -135,10 +129,13 @@ class Simulator(gym.Env):
 
         :return: the starting/initial observation of the environment
         """
+        # read the NSPRs to be evaluated
+        self.nsprs = reader.read_nsprs(nsprs_path=self.nsprs_path)
+
         # reset partial rewards to be accumulated across the episodes' steps
-        self._acceptance_reward = 0
-        self._resource_consumption_reward = 0
-        self._load_balancing_reward = 0
+        self._acceptance_rewards = []
+        self._resource_consumption_rewards = []
+        self._load_balancing_rewards = []
 
         # initialize lists
         cpu_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
@@ -192,23 +189,85 @@ class Simulator(gym.Env):
         return obs
 
     def step(self, action):
-        physical_node_id = action
+        """ Perform an action in the environment
+
+        :param action: the action to be performed
+        :return: next observation, reward, done (True if the episode is over), info
+        """
+        physical_node_id = action  # alias
         reward = 0
         done = False
         info = {}
 
         if physical_node_id < 0:
             # it wasn't possible to place the VNF
-            self._acceptance_reward = -100
+            reward = self._rval_rejected_vnf
             done = True
             self.restore_avail_resources(nspr=self.cur_nspr)
         else:
             # place the VNF and update the resources availabilities of the physical node
             if self.cur_nspr is not None:
                 cur_vnf = self.cur_nspr.nodes[self.cur_vnf_id]
+                physical_node = self.psn.nodes[physical_node_id]
 
-        if done:
-            reward = self._acceptance_reward + self._resource_consumption_reward + self._load_balancing_reward
+                # update the resources availabilities of the physical node
+                cur_vnf['placed'] = physical_node_id
+                physical_node['availCPU'] -= cur_vnf['reqCPU']
+                physical_node['availRAM'] -= cur_vnf['reqRAM']
+
+                # update acceptance reward and load balancing reward
+                self._acceptance_rewards.append(self._rval_accepted_vnf)
+                self._load_balancing_rewards.append(
+                    physical_node['availCPU'] / physical_node['CPUcap'] +
+                    physical_node['availRAM'] / physical_node['RAMcap']
+                )
+
+                # connect the placed VNF to the other VNFs it's supposed to be connected to
+                cur_vnf_VLs = self.get_cur_vnf_vls(self.cur_vnf_id, self.cur_nspr)  # get the VLs involving the current VNF
+                for (source_vnf, target_vnf), vl in cur_vnf_VLs.items():
+                    # get the physical nodes where the source and target VNFs are placed
+                    source_node = self.cur_nspr.nodes[source_vnf]['placed']
+                    target_node = self.cur_nspr.nodes[target_vnf]['placed']
+
+                    # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
+                    if not vl['placed'] and source_node >= 0 and target_node >= 0:
+                        self._cur_vl_reqBW = vl['reqBW']
+                        psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
+                                                    weight=self.compute_link_weight, method='dijkstra')
+
+                        # place the VL onto the PSN and update the resources availabilities of the physical links involved
+                        for i in range(len(psn_path) - 1):
+                            physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
+                            physical_link['availBW'] -= vl['reqBW']
+                        vl['placed'] = psn_path
+
+                        # update the resource consumption reward
+                        path_length = len(psn_path) - 1
+                        self._resource_consumption_rewards.append(1 / path_length if path_length > 0 else 1)
+
+                # save the ID of the next VNF
+                if self.cur_nspr_unplaced_vnfs_ids:
+                    self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
+                    reward = 0  # global reward is non-zero only after the whole NSPR is placed
+                else:
+                    # it means we finished the VNFs of the current NSPR, so...
+                    # update global reward because the NSPR is fully placed
+                    reward = np.stack((self._acceptance_rewards,
+                                       self._resource_consumption_rewards,
+                                       self._load_balancing_rewards)).prod(axis=0).sum()
+
+                    # pick next NSPR
+                    self.cur_nspr = None
+                    for arrival_time, nspr in self.nsprs.items():
+                        if self.nsprs[arrival_time]:
+                            self.cur_nspr = self.nsprs[arrival_time].pop(0)
+                            break
+                    if self.cur_nspr is not None:
+                        self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
+                        self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
+                    else:
+                        # it means we finished all the NSPRs
+                        done = True
 
         return self._get_observation(), reward, done, info
 
@@ -240,41 +299,6 @@ class Simulator(gym.Env):
         :return: the weight of that link
         """
         return 1 if link['availBW'] >= self._cur_vl_reqBW else math.inf
-
-    def evaluate_nspr(self, nspr: nx.Graph) -> bool:
-        """ Place all the VNFs and VLs onto the physical network and update the available resources
-
-        :param nspr: a NSPR to be evaluated (accepted and placed / reject)
-        :return: True if the NSPR is accepted and placed on the PSN, else False
-        """
-        for vnf_id, vnf in nspr.nodes.items():
-            if vnf['placed'] < 0:  # it means the VNF is not currently placed onto a physical node
-                # select the physical node onto which to place the VNF
-                physical_node_id, physical_node = self.decision_maker.decide_next_node(psn=self.psn, vnf=vnf)
-                self.step(action=physical_node_id)
-
-                # place the VNF and update the resources availabilities of the physical node
-                vnf['placed'] = physical_node_id
-                physical_node['availCPU'] -= vnf['reqCPU']
-                physical_node['availRAM'] -= vnf['reqRAM']
-
-                # connect the placed VNF to the other VNFs it's supposed to be connected to
-                cur_vnf_VLs = self.get_cur_vnf_vls(vnf_id, nspr)  # get the VLs involving the current VNF
-                for (source_vnf, target_vnf), vl in cur_vnf_VLs.items():
-                    # get the physical nodes where the source and target VNFs are placed
-                    source_node, target_node = nspr.nodes[source_vnf]['placed'], nspr.nodes[target_vnf]['placed']
-
-                    # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
-                    if not vl['placed'] and source_node >= 0 and target_node >= 0:
-                        self._cur_vl_reqBW = vl['reqBW']
-                        psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
-                                                    weight=self.compute_link_weight, method='dijkstra')
-
-                        # place the VL onto the PSN and update the resources availabilities of the physical links involved
-                        for i in range(len(psn_path) - 1):
-                            physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
-                            physical_link['availBW'] -= vl['reqBW']
-                        vl['placed'] = psn_path
 
     def restore_avail_resources(self, nspr: nx.Graph):
         """ Method called in case a NSPR is not accepted.
