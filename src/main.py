@@ -10,7 +10,7 @@ if __name__ == '__main__':
     check_env(sim)  # check if the environment conforms to gym's API
 
     done = True
-    sim_steps = 100
+    sim_steps = 10000
     for step in range(sim_steps):
         if done:
             init_obs = sim.reset()
@@ -39,6 +39,6 @@ if __name__ == '__main__':
         # TODO: this takes random actions as a placeholder
         action = sim.action_space.sample()
 
-        sim.step(action=0, nspr=cur_nspr)
+        sim.step(action=action)
 
     sim.close()
