@@ -136,6 +136,6 @@ class Simulator:
 
 if __name__ == '__main__':
     sim = Simulator(psn_file="../PSNs/triangle.graphml",
-                    nsprs_path="../NSPRs/",
+                    nsprs_path="../NSPRs/box.graphml",
                     decision_maker_type="random")
     sim.start()

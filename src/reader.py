@@ -137,7 +137,7 @@ def read_nsprs(nsprs_path: str) -> Dict[int, List[nx.Graph]]:
     # save the NSPRs in a dict with the arrival times as keys
     nspr_dict = {}
     for graphml_file in os.listdir(dir_path):
-        nspr = read_single_nspr(os.path.join(nsprs_path, graphml_file))
+        nspr = read_single_nspr(os.path.join(dir_path, graphml_file))
         if nspr.graph['ArrivalTime'] not in nspr_dict.keys():
             nspr_dict[nspr.graph['ArrivalTime']] = [nspr]
         else:
