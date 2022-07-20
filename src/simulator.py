@@ -47,8 +47,8 @@ class Simulator(gym.Env):
         self._load_balancing_rewards = []
 
         # reward values for specific outcomes
-        self._rval_accepted_vnf = 100
-        self._rval_rejected_vnf = -100
+        self.rval_accepted_vnf = 100
+        self.rval_rejected_vnf = -100
 
         # Action space and observation space (gym.Env required attributes)
         ONE_BILLION = 1000000000  # constant for readability
@@ -88,7 +88,6 @@ class Simulator(gym.Env):
             idx += 1
         return ids_map
 
-    # TODO: probably remove this method (probabily useless and there are some mistakes)
     def _get_observation(self, cur_vnf: Union[dict, None]) -> dict:
         """ Method used to get the observation of the environment.
 
@@ -132,6 +131,12 @@ class Simulator(gym.Env):
             'nspr_state': nspr_state
         }
         return obs
+
+    def reset_partial_rewards(self):
+        """ Resets the partial rewards (used in case a NSPR cannot be placed) """
+        self._acceptance_rewards = []
+        self._resource_consumption_rewards = []
+        self._load_balancing_rewards = []
 
     def reset(self):
         """ Method used to reset the environment
@@ -178,7 +183,7 @@ class Simulator(gym.Env):
 
         if physical_node_id < 0:
             # it wasn't possible to place the VNF
-            reward = self._rval_rejected_vnf
+            reward = self.rval_rejected_vnf
             done = True
             self.restore_avail_resources(nspr=self.cur_nspr)
         else:
@@ -193,7 +198,7 @@ class Simulator(gym.Env):
                 physical_node['availRAM'] -= cur_vnf['reqRAM']
 
                 # update acceptance reward and load balancing reward
-                self._acceptance_rewards.append(self._rval_accepted_vnf)
+                self._acceptance_rewards.append(self.rval_accepted_vnf)
                 self._load_balancing_rewards.append(
                     physical_node['availCPU'] / physical_node['CPUcap'] +
                     physical_node['availRAM'] / physical_node['RAMcap']
@@ -232,6 +237,8 @@ class Simulator(gym.Env):
                     reward = np.stack((self._acceptance_rewards,
                                        self._resource_consumption_rewards,
                                        self._load_balancing_rewards)).prod(axis=0).sum()
+                    # reset partial rewards
+                    self.reset_partial_rewards()
 
                     # pick next NSPR
                     self.cur_nspr = None
@@ -302,6 +309,8 @@ class Simulator(gym.Env):
                 for i in range(len(vl['placed']) - 1):
                     physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
                     physical_link['availBW'] += vl['reqBW']
+        # reset partial rewards
+        self.reset_partial_rewards()
 
     def start(self, sim_steps: int = 100):
         """ Main cycle of the simulator
