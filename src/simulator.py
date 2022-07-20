@@ -1,5 +1,6 @@
 import math
 import sys
+from typing import Union
 
 import gym
 
@@ -27,7 +28,7 @@ class Simulator(gym.Env):
         """
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path  # path to the directory containing the NSPRs
-        self.nsprs = None   # will be initialized in the reset method
+        self.nsprs = None  # will be initialized in the reset method
         self.decision_maker = decision_makers[decision_maker_type]
 
         # attributes needed in the method 'step' because it has no access to observations
@@ -88,11 +89,10 @@ class Simulator(gym.Env):
         return ids_map
 
     # TODO: probably remove this method (probabily useless and there are some mistakes)
-    def _get_observation(self):
+    def _get_observation(self, cur_vnf: Union[dict, None]) -> dict:
         """ Method used to get the observation of the environment.
 
-        :param reset: if True, the observation is the reset state of the environment
-
+        :param cur_vnf: current VNF being evaluated
         :return: an instance of an observation from the environment
         """
         # initialize lists
@@ -110,11 +110,19 @@ class Simulator(gym.Env):
                 if node_id in extremes:
                     bw_capacity_per_node[self._map_id_idx[node_id]] += link['availBW']
 
-        # if this method is called form the reset method, set this part of the observation with zeros
-        nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
-                      'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
+        # state regarding the NSPR
+        if cur_vnf is not None:
+            cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=self.cur_vnf_id, nspr=self.cur_nspr)
+            nspr_state = {'cur_vnf_cpu_req': np.array([cur_vnf['reqCPU']], dtype=int),
+                          'cur_vnf_ram_req': np.array([cur_vnf['reqRAM']], dtype=int),
+                          'cur_vnf_bw_req': np.array([sum(vl['reqBW'] for vl in cur_vnf_vls.values())], dtype=int),
+                          'vnfs_still_to_place': np.array([len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)}
+        else:
+            nspr_state = {'cur_vnf_cpu_req': np.array([0], dtype=int), 'cur_vnf_ram_req': np.array([0], dtype=int),
+                          'cur_vnf_bw_req': np.array([0], dtype=int), 'vnfs_still_to_place': np.array([0], dtype=int)}
 
-        return {
+        # instance of an observation from the environment
+        obs = {
             'psn_state': {
                 'cpu_capacities': cpu_capacities,
                 'ram_capacities': ram_capacities,
@@ -123,6 +131,7 @@ class Simulator(gym.Env):
             },
             'nspr_state': nspr_state
         }
+        return obs
 
     def reset(self):
         """ Method used to reset the environment
@@ -137,21 +146,6 @@ class Simulator(gym.Env):
         self._resource_consumption_rewards = []
         self._load_balancing_rewards = []
 
-        # initialize lists
-        cpu_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
-        ram_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
-        bw_capacity_per_node = np.zeros(len(self.psn.nodes), dtype=np.float32)
-        placement_state = np.zeros(len(self.psn.nodes), dtype=int)
-
-        # scan all nodes and save data in lists
-        for node_id, node in self.psn.nodes.items():
-            # get nodes' capacities (if routers, set these to 0)
-            cpu_capacities[self._map_id_idx[node_id]] = node.get('CPUcap', 0)
-            ram_capacities[self._map_id_idx[node_id]] = node.get('RAMcap', 0)
-            for extremes, link in self.psn.edges.items():
-                if node_id in extremes:
-                    bw_capacity_per_node[self._map_id_idx[node_id]] += link['availBW']
-
         # Save the first NSPR as current one to be evaluated
         # TODO: self.nsprs is a dict with the arrival time as key and the list of VNFs as value.
         #       Currently, we don't consider the arrival time during the agent's training,
@@ -162,30 +156,13 @@ class Simulator(gym.Env):
                 self.cur_nspr = self.nsprs[arrival_time].pop(0)
                 break
 
+        cur_vnf = None
         if self.cur_nspr is not None:
             self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
             self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
             cur_vnf = self.cur_nspr.nodes[self.cur_vnf_id]
-            cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=self.cur_vnf_id, nspr=self.cur_nspr)
-            nspr_state = {'cur_vnf_cpu_req': np.array([cur_vnf['reqCPU']], dtype=int),
-                          'cur_vnf_ram_req': np.array([cur_vnf['reqRAM']], dtype=int),
-                          'cur_vnf_bw_req': np.array([sum(vl['reqBW'] for vl in cur_vnf_vls.values())], dtype=int),
-                          'vnfs_still_to_place': np.array([len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)}
-        else:
-            # there's no NSPR to be evaluated, so set the NSPR state to zeros
-            nspr_state = {'cur_vnf_cpu_req': np.array([0]), 'cur_vnf_ram_req': np.array([0]),
-                          'cur_vnf_bw_req': np.array([0]), 'vnfs_still_to_place': np.array([0])}
 
-        # instance of a complete observation
-        obs = {
-            'psn_state': {
-                'cpu_capacities': cpu_capacities,
-                'ram_capacities': ram_capacities,
-                'bw_capacity_per_node': bw_capacity_per_node,
-                'placement_state': placement_state,
-            },
-            'nspr_state': nspr_state
-        }
+        obs = self._get_observation(cur_vnf=cur_vnf)
         return obs
 
     def step(self, action):
@@ -269,7 +246,13 @@ class Simulator(gym.Env):
                         # it means we finished all the NSPRs
                         done = True
 
-        return self._get_observation(), reward, done, info
+        # new observation
+        if self.cur_nspr is not None:
+            obs = self._get_observation(cur_vnf=self.cur_nspr.nodes[self.cur_vnf_id])
+        else:
+            obs = self._get_observation(cur_vnf=None)
+
+        return obs, reward, done, info
 
     @staticmethod
     def get_cur_vnf_vls(vnf_id: int, nspr: nx.Graph) -> dict:
