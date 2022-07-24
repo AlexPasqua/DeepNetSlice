@@ -1,6 +1,6 @@
 import math
 import sys
-from typing import Union
+from typing import Union, Tuple, Dict
 
 import gym
 
@@ -9,6 +9,9 @@ import numpy as np
 
 from decision_makers import decision_makers
 import reader
+
+
+GymObs = Union[Tuple, dict, np.ndarray, int]
 
 
 class Simulator(gym.Env):
@@ -39,7 +42,12 @@ class Simulator(gym.Env):
         self._cur_vl_reqBW = 0  # auxiliary attribute needed in method 'self.compute_link_weight'
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
-        self._map_id_idx = self._init_map_id_idx()
+        nodes_ids = list(self.psn.nodes.keys())
+        self._map_id_idx = {nodes_ids[idx]: idx for idx in range(len(nodes_ids))}
+
+        # map (dict) between an index of a list (incrementing int) and the ID of a server
+        servers_ids = [node_id for node_id, node in self.psn.nodes.items() if node['NodeType'] == 'server']
+        self._servers_map_idx_id = {idx: servers_ids[idx] for idx in range(len(servers_ids))}
 
         # partial rewards to be accumulated across the steps of evaluation of a single NSPR
         self._acceptance_rewards = []
@@ -47,49 +55,33 @@ class Simulator(gym.Env):
         self._load_balancing_rewards = []
 
         # reward values for specific outcomes
-        self._rval_accepted_vnf = 100
-        self._rval_rejected_vnf = -100
+        self.rval_accepted_vnf = 100
+        self.rval_rejected_vnf = -100
 
         # Action space and observation space (gym.Env required attributes)
         ONE_BILLION = 1000000000  # constant for readability
         n_nodes = len(self.psn.nodes)
-        self.action_space = gym.spaces.Discrete(n_nodes)
+        # action space = number of servers
+        self.action_space = gym.spaces.Discrete(len(servers_ids))
         self.observation_space = gym.spaces.Dict({
-            'psn_state': gym.spaces.Dict({
-                'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
-                'ram_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
-                # for each physical node, sum of the BW of the physical links connected to it
-                'bw_capacity_per_node': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
-                # for each physical node, number of VNFs of the current NSPR placed on it
-                'placement_state': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
-            }),
-            'nspr_state': gym.spaces.Dict({
-                # note: apparently it's not possible to pass "math.inf" or "sys.maxsize" as a gym.spaces.Box's high value
-                'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
-                'cur_vnf_ram_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
-                # sum of the required BW of each VL connected to the current VNF
-                'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
-                'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
-            })
+            # PSN STATE
+            'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'ram_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            # for each physical node, sum of the BW of the physical links connected to it
+            'bw_capacity_per_node': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            # for each physical node, number of VNFs of the current NSPR placed on it
+            'placement_state': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
+
+            # NSPR STATE
+            # note: apparently it's not possible to pass "math.inf" or "sys.maxsize" as a gym.spaces.Box's high value
+            'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+            'cur_vnf_ram_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+            # sum of the required BW of each VL connected to the current VNF
+            'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+            'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
         })
 
-    def _init_map_id_idx(self):
-        """ Method used to initialize a map between the IDs of the physical node and an integer,
-        such that a bunch of N IDs gets mapped to a bunch of N successive integers from 0 to N-1.
-        e.g. IDs: 0, 1, 3, 9 -> IDs_map: 0:0, 1:1, 3:2, 9:3.
-        This is used because the simulator needs to have some lists where each element corresponds to a node,
-        so we need a way to know which index corresponds to which node.
-
-        :return: dict mapping the IDs to the corresponding integer
-        """
-        ids_map, idx = {}, 0
-        for node_id, node in self.psn.nodes.items():
-            ids_map[node_id] = idx
-            idx += 1
-        return ids_map
-
-    # TODO: probably remove this method (probabily useless and there are some mistakes)
-    def _get_observation(self, cur_vnf: Union[dict, None]) -> dict:
+    def _get_observation(self, cur_vnf: Union[dict, None]) -> GymObs:
         """ Method used to get the observation of the environment.
 
         :param cur_vnf: current VNF being evaluated
@@ -123,17 +115,21 @@ class Simulator(gym.Env):
 
         # instance of an observation from the environment
         obs = {
-            'psn_state': {
-                'cpu_capacities': cpu_capacities,
-                'ram_capacities': ram_capacities,
-                'bw_capacity_per_node': bw_capacity_per_node,
-                'placement_state': placement_state,
-            },
-            'nspr_state': nspr_state
+            'cpu_capacities': cpu_capacities,
+            'ram_capacities': ram_capacities,
+            'bw_capacity_per_node': bw_capacity_per_node,
+            'placement_state': placement_state,
+            **nspr_state
         }
         return obs
 
-    def reset(self):
+    def reset_partial_rewards(self):
+        """ Resets the partial rewards (used in case a NSPR cannot be placed) """
+        self._acceptance_rewards = []
+        self._resource_consumption_rewards = []
+        self._load_balancing_rewards = []
+
+    def reset(self) -> GymObs:
         """ Method used to reset the environment
 
         :return: the starting/initial observation of the environment
@@ -165,20 +161,22 @@ class Simulator(gym.Env):
         obs = self._get_observation(cur_vnf=cur_vnf)
         return obs
 
-    def step(self, action):
+    def step(self, action) -> Tuple[GymObs, float, bool, dict]:
         """ Perform an action in the environment
 
         :param action: the action to be performed
+            more in detail, it's the index in the list of server corresponding ot a certain server ID,
+            the mapping between this index and the server ID is done in the self._servers_map_idx_id dictionary
         :return: next observation, reward, done (True if the episode is over), info
         """
-        physical_node_id = action  # alias
+        physical_node_id = self._servers_map_idx_id[action]
         reward = 0
         done = False
         info = {}
 
         if physical_node_id < 0:
             # it wasn't possible to place the VNF
-            reward = self._rval_rejected_vnf
+            reward = self.rval_rejected_vnf
             done = True
             self.restore_avail_resources(nspr=self.cur_nspr)
         else:
@@ -193,7 +191,7 @@ class Simulator(gym.Env):
                 physical_node['availRAM'] -= cur_vnf['reqRAM']
 
                 # update acceptance reward and load balancing reward
-                self._acceptance_rewards.append(self._rval_accepted_vnf)
+                self._acceptance_rewards.append(self.rval_accepted_vnf)
                 self._load_balancing_rewards.append(
                     physical_node['availCPU'] / physical_node['CPUcap'] +
                     physical_node['availRAM'] / physical_node['RAMcap']
@@ -232,6 +230,8 @@ class Simulator(gym.Env):
                     reward = np.stack((self._acceptance_rewards,
                                        self._resource_consumption_rewards,
                                        self._load_balancing_rewards)).prod(axis=0).sum()
+                    # reset partial rewards
+                    self.reset_partial_rewards()
 
                     # pick next NSPR
                     self.cur_nspr = None
@@ -302,23 +302,5 @@ class Simulator(gym.Env):
                 for i in range(len(vl['placed']) - 1):
                     physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
                     physical_link['availBW'] += vl['reqBW']
-
-    def start(self, sim_steps: int = 100):
-        """ Main cycle of the simulator
-
-        :param sim_steps: number of simulation steps to be performed
-        """
-        current_nsprs = []
-        for step in range(sim_steps):
-            # add eventual newly arrived NSPRs to the list of NSPRs to be evaluated and skip if there are none
-            current_nsprs += self.nsprs.get(step, [])
-            if len(current_nsprs) == 0:
-                continue
-
-            # pop a NSPR from the list of NSPRs that arrived already
-            cur_nspr = current_nsprs.pop(0)
-
-            # accept/reject NSPR
-            outcome = self.evaluate_nspr(nspr=cur_nspr)
-            if not outcome:
-                self.restore_avail_resources(nspr=cur_nspr)
+        # reset partial rewards
+        self.reset_partial_rewards()
