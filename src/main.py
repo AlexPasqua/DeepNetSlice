@@ -1,9 +1,10 @@
 import gym
-from gym.utils.env_checker import check_env
+from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 
 from simulator import Simulator
+
 
 if __name__ == '__main__':
     env = Simulator(psn_file='../PSNs/triangle.graphml',
@@ -11,10 +12,13 @@ if __name__ == '__main__':
                     decision_maker_type='random')
     check_env(env)  # check if the environment conforms to gym's API
 
+    env = make_vec_env(lambda: env, n_envs=1)
+
     model = A2C(
         policy="MultiInputPolicy",
         env=env,
         n_steps=10,
+        verbose=1
     )
 
     model.learn(total_timesteps=10000, log_interval=10)

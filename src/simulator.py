@@ -29,6 +29,8 @@ class Simulator(gym.Env):
         :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
         :param decision_maker_type: type of decision maker
         """
+        super(Simulator, self).__init__()
+
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path  # path to the directory containing the NSPRs
         self.nsprs = None  # will be initialized in the reset method
