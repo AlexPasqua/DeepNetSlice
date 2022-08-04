@@ -1,6 +1,3 @@
-from .random_decision_maker import RandomAgent
+from .random_agent import RandomAgent
 
 
-decision_makers = {
-    'random': RandomAgent()
-}

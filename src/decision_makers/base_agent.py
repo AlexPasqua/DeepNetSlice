@@ -1,8 +1,6 @@
-from abc import abstractmethod, ABC
-from typing import Type, Union, Optional, Tuple
+from abc import ABC
+from typing import Type, Union
 
-import networkx as nx
-import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.type_aliases import GymEnv, Schedule
@@ -17,9 +15,10 @@ class BaseAgent(BaseAlgorithm, ABC):
             env: Union[GymEnv, str, None],
             policy_base: Type[BasePolicy],
             learning_rate: Union[float, Schedule],
-            limited: bool = False
+            limited: bool = False,
+            support_multiple_envs: bool = False,
     ):
-        super().__init__(policy, env, policy_base, learning_rate)
+        super().__init__(policy, env, policy_base, learning_rate, support_multi_env=support_multiple_envs)
         self.limited = limited  # if true, the agent will only choose physical nodes/links with enough available resources
 
     @staticmethod

@@ -26,8 +26,7 @@ def evaluate_agent(model, env):
 
 if __name__ == '__main__':
     env = Simulator(psn_file='../PSNs/triangle.graphml',
-                    nsprs_path='../NSPRs/dummy_NSPR_1.graphml',
-                    decision_maker_type='random')
+                    nsprs_path='../NSPRs/dummy_NSPR_1.graphml')
 
     check_env(env)  # check if the environment conforms to gym's API
 

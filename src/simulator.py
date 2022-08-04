@@ -6,7 +6,6 @@ import networkx as nx
 import numpy as np
 
 import reader
-from decision_makers import decision_makers
 
 GymObs = Union[Tuple, dict, np.ndarray, int]
 
