@@ -1,15 +1,12 @@
 import math
-import sys
-from typing import Union, Tuple, Dict
+from typing import Union, Tuple
 
 import gym
-
 import networkx as nx
 import numpy as np
 
-from decision_makers import decision_makers
 import reader
-
+from decision_makers import decision_makers
 
 GymObs = Union[Tuple, dict, np.ndarray, int]
 
@@ -23,18 +20,16 @@ class Simulator(gym.Env):
         decision_maker (DecisionMaker): decision maker used to decide the next VNF to place onto the PSN
     """
 
-    def __init__(self, psn_file: str, nsprs_path: str, decision_maker_type: str):
+    def __init__(self, psn_file: str, nsprs_path: str):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
         :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
-        :param decision_maker_type: type of decision maker
         """
         super(Simulator, self).__init__()
 
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path  # path to the directory containing the NSPRs
         self.nsprs = None  # will be initialized in the reset method
-        self.decision_maker = decision_makers[decision_maker_type]
 
         # attributes needed in the method 'step' because it has no access to observations
         self.cur_nspr = None  # used to keep track of the current NSPR being evaluated
@@ -95,6 +90,7 @@ class Simulator(gym.Env):
         bw_capacity_per_node = np.zeros(len(self.psn.nodes), dtype=np.float32)
         placement_state = np.zeros(len(self.psn.nodes), dtype=int)
 
+        # TODO: this could probably be made more efficient
         # scan all nodes and save data in lists
         for node_id, node in self.psn.nodes.items():
             # get nodes' capacities (if routers, set these to 0)
