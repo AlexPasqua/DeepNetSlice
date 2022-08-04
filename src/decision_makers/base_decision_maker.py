@@ -1,11 +1,26 @@
+from abc import abstractmethod, ABC
+from typing import Type, Union, Optional, Tuple
+
 import networkx as nx
-from abc import abstractmethod
+import numpy as np
+from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines3.common.policies import BasePolicy
+from stable_baselines3.common.type_aliases import GymEnv, Schedule
 
 
-class BaseDecisionMaker:
-    """ Base decision maker. All other decision makers need to inherit from this class """
-    def __init__(self):
-        pass
+class BaseAgent(BaseAlgorithm, ABC):
+    """ Base agent class """
+
+    def __init__(
+            self,
+            policy: Type[BasePolicy],
+            env: Union[GymEnv, str, None],
+            policy_base: Type[BasePolicy],
+            learning_rate: Union[float, Schedule],
+            limited: bool = False
+    ):
+        super().__init__(policy, env, policy_base, learning_rate)
+        self.limited = limited  # if true, the agent will only choose physical nodes/links with enough available resources
 
     @staticmethod
     def resources_reqs_satisfied(physical_node: dict, vnf: dict):
@@ -18,13 +33,3 @@ class BaseDecisionMaker:
         if physical_node['availCPU'] >= vnf['reqCPU'] and physical_node['availRAM'] >= vnf['reqRAM']:
             return True
         return False
-
-    @abstractmethod
-    def decide_next_node(self, psn: nx.Graph, nspr: nx.Graph):
-        """ Given a PSN a NSPR, decides where to place the first VNF that hasn't been placed onto the PSN yet
-
-        :param psn: a graph representation of the PSN
-        :param nspr: a graph representation of a NSPR
-        :raise NotImplementedError: because this is an abstract method that need to be overridden in sub-classes
-        """
-        raise NotImplementedError

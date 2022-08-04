@@ -1,6 +1,6 @@
-from .random_decision_maker import RandomDecisionMaker
+from .random_decision_maker import RandomAgent
 
 
 decision_makers = {
-    'random': RandomDecisionMaker()
+    'random': RandomAgent()
 }
