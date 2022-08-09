@@ -169,17 +169,18 @@ class Simulator(gym.Env):
             the mapping between this index and the server ID is done in the self._servers_map_idx_id dictionary
         :return: next observation, reward, done (True if the episode is over), info
         """
-        physical_node_id = self._servers_map_idx_id[action]
         reward = 0
         done = False
         info = {}
 
-        if physical_node_id < 0:
+        if action < 0:
             # it wasn't possible to place the VNF
             reward = self.rval_rejected_vnf
             done = True
             self.restore_avail_resources(nspr=self.cur_nspr)
         else:
+            physical_node_id = self._servers_map_idx_id[action]
+
             # place the VNF and update the resources availabilities of the physical node
             if self.cur_nspr is not None:
                 cur_vnf = self.cur_nspr.nodes[self.cur_vnf_id]
