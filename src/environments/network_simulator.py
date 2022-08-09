@@ -51,6 +51,7 @@ class Simulator(gym.Env):
         # partial rewards to be accumulated across the steps of evaluation of a single NSPR
         self._acceptance_rewards = []
         self._resource_consumption_rewards = []
+        self._cur_resource_consumption_rewards = []
         self._load_balancing_rewards = []
 
         # reward values for specific outcomes
@@ -200,26 +201,41 @@ class Simulator(gym.Env):
 
                 # connect the placed VNF to the other VNFs it's supposed to be connected to
                 cur_vnf_VLs = self.get_cur_vnf_vls(self.cur_vnf_id, self.cur_nspr)  # get the VLs involving the current VNF
-                for (source_vnf, target_vnf), vl in cur_vnf_VLs.items():
-                    # get the physical nodes where the source and target VNFs are placed
-                    source_node = self.cur_nspr.nodes[source_vnf]['placed']
-                    target_node = self.cur_nspr.nodes[target_vnf]['placed']
+                if not cur_vnf_VLs:
+                    # if the VNF is detached from all others, R.C. reward is 1,
+                    # so it's the neutral when aggregating the rewards into the global one
+                    self._resource_consumption_rewards.append(1)
+                else:
+                    for (source_vnf, target_vnf), vl in cur_vnf_VLs.items():
+                        # get the physical nodes where the source and target VNFs are placed
+                        source_node = self.cur_nspr.nodes[source_vnf]['placed']
+                        target_node = self.cur_nspr.nodes[target_vnf]['placed']
 
-                    # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
-                    if not vl['placed'] and source_node >= 0 and target_node >= 0:
-                        self._cur_vl_reqBW = vl['reqBW']
-                        psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
-                                                    weight=self.compute_link_weight, method='dijkstra')
+                        # if the VL isn't placed yet and both the source and target VNFs are placed, place the VL
+                        if not vl['placed'] and source_node >= 0 and target_node >= 0:
+                            self._cur_vl_reqBW = vl['reqBW']
+                            psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
+                                                        weight=self.compute_link_weight, method='dijkstra')
 
-                        # place the VL onto the PSN and update the resources availabilities of the physical links involved
-                        for i in range(len(psn_path) - 1):
-                            physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
-                            physical_link['availBW'] -= vl['reqBW']
-                        vl['placed'] = psn_path
+                            # place the VL onto the PSN and update the resources availabilities of the physical links involved
+                            for i in range(len(psn_path) - 1):
+                                physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
+                                physical_link['availBW'] -= vl['reqBW']
+                            vl['placed'] = psn_path
 
-                        # update the resource consumption reward
-                        path_length = len(psn_path) - 1
-                        self._resource_consumption_rewards.append(1 / path_length if path_length > 0 else 1)
+                            # update the resource consumption reward
+                            path_length = len(psn_path) - 1
+                            self._cur_resource_consumption_rewards.append(1 / path_length if path_length > 0 else 1)
+
+                    # aggregate the resource consumption rewards into a single value for this action
+                    n_VLs_placed_now = len(self._cur_resource_consumption_rewards)
+                    if n_VLs_placed_now == 0:
+                        self._resource_consumption_rewards.append(1)
+                    else:
+                        self._resource_consumption_rewards.append(
+                            sum(self._cur_resource_consumption_rewards) / n_VLs_placed_now
+                        )
+                        self._cur_resource_consumption_rewards = []
 
                 # save the ID of the next VNF
                 if self.cur_nspr_unplaced_vnfs_ids:
