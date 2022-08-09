@@ -15,11 +15,9 @@ class BaseAgent(BaseAlgorithm, ABC):
             env: Union[GymEnv, str, None],
             policy_base: Type[BasePolicy],
             learning_rate: Union[float, Schedule],
-            limited: bool = False,
             support_multiple_envs: bool = False,
     ):
         super().__init__(policy, env, policy_base, learning_rate, support_multi_env=support_multiple_envs)
-        self.limited = limited  # if true, the agent will only choose physical nodes/links with enough available resources
 
     @staticmethod
     def resources_reqs_satisfied(physical_node: dict, vnf: dict):

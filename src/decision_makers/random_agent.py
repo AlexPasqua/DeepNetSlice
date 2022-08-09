@@ -13,15 +13,11 @@ class RandomAgent(BaseAgent):
     when deciding a physical node where to place a VNF, it chooses one at random
     """
 
-    def __init__(
-            self,
-            env: Union[GymEnv, str, None],
-            limited: bool = False
-    ):
+    def __init__(self, env: Union[GymEnv, str, None]):
         policy = RandomPolicy
         policy_base = RandomPolicy
         learning_rate = 0.  # any value will do, it's not used
-        super().__init__(policy, env, policy_base, learning_rate, limited, support_multiple_envs=False)
+        super().__init__(policy, env, policy_base, learning_rate, support_multiple_envs=False)
         self._setup_model()
 
     def _setup_model(self) -> None:
