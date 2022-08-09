@@ -3,8 +3,8 @@ from typing import Union, Optional
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 
-from custom_policies.random_policy import RandomPolicy
-from decision_makers.base_agent import BaseAgent
+from policies.random_policy import RandomPolicy
+from agents.base_agent import BaseAgent
 
 
 class RandomAgent(BaseAgent):

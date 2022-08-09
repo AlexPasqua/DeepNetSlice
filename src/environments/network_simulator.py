@@ -1,6 +1,9 @@
 import math
 from typing import Union, Tuple
 
+import src.spaces
+from spaces.enhanced_discrete import EnhancedDiscrete
+
 import gym
 import networkx as nx
 import numpy as np
@@ -58,7 +61,7 @@ class Simulator(gym.Env):
         ONE_BILLION = 1000000000  # constant for readability
         n_nodes = len(self.psn.nodes)
         # action space = number of servers
-        self.action_space = gym.spaces.Discrete(len(servers_ids))
+        self.action_space = src.spaces.EnhancedDiscrete(len(servers_ids) + 1, start=-1)
         self.observation_space = gym.spaces.Dict({
             # PSN STATE
             'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),

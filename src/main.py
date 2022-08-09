@@ -2,7 +2,7 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 
-from simulator import Simulator
+from environments.network_simulator import Simulator
 
 
 def evaluate_agent(model, env):
