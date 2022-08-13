@@ -25,7 +25,7 @@ def _check_required_attributes(network: nx.Graph, required_node_attributes: Tupl
 
     :raise AssertionError:
         - in case some nodes/links don't contain all the required parameters
-        - in case some non admissible values are used for some arguments
+        - in case some non-admissible values are used for some arguments
     """
     # check graph
     if "E2ELatency" in network.graph.keys():
@@ -131,11 +131,16 @@ def read_nsprs(nsprs_path: str) -> Dict[int, List[nx.Graph]]:
     if not os.path.isdir(nsprs_path) and not os.path.isfile(nsprs_path):
         raise ValueError(f"{nsprs_path} is neither a directory nor a file")
 
-    # if nspr_path is a file, get the path of its directory
-    dir_path = os.path.split(nsprs_path)[0] if os.path.isfile(nsprs_path) else nsprs_path
+    nspr_dict = {}  # save the NSPRs in a dict with the arrival times as keys
+    if os.path.isfile(nsprs_path):
+        nspr = read_single_nspr(nsprs_path)
+        if nspr.graph['ArrivalTime'] not in nspr_dict.keys():
+            nspr_dict[nspr.graph['ArrivalTime']] = [nspr]
+        else:
+            nspr_dict[nspr.graph['ArrivalTime']].append(nspr)
+        return nspr_dict
 
-    # save the NSPRs in a dict with the arrival times as keys
-    nspr_dict = {}
+    dir_path = nsprs_path
     for graphml_file in os.listdir(dir_path):
         nspr = read_single_nspr(os.path.join(dir_path, graphml_file))
         if nspr.graph['ArrivalTime'] not in nspr_dict.keys():

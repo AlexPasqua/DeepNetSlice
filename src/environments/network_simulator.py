@@ -138,7 +138,7 @@ class Simulator(gym.Env):
         :param vnf: VNF to check
         :return: True if the physical node has enough resources to satisfy the VNF's requirements, False otherwise
         """
-        if physical_node['CPUcap'] < vnf['reqCPU'] or physical_node['RAMcap'] < vnf['reqRAM']:
+        if physical_node['availCPU'] < vnf['reqCPU'] or physical_node['availRAM'] < vnf['reqRAM']:
             return False
         return True
 
@@ -257,11 +257,23 @@ class Simulator(gym.Env):
                         psn_path = nx.shortest_path(G=self.psn, source=source_node, target=target_node,
                                                     weight=self.compute_link_weight, method='dijkstra')
 
+                        """ if NO path is available, 'nx.shortest_path' will return an invalid path.
+                        Only after the whole VL has been placed, it is possible to restore the resources availabilities,
+                        so we use this variable to save that the resources have been exceeded as soon as we find this to happen,
+                        and only after the VL placement, if this var is True, we restore the resources availabilities. """
+                        exceeded_bw = False
+
                         # place the VL onto the PSN and update the resources availabilities of the physical links involved
                         for i in range(len(psn_path) - 1):
                             physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
                             physical_link['availBW'] -= vl['reqBW']
+                            if physical_link['availBW'] < 0:
+                                exceeded_bw = True
                         vl['placed'] = psn_path
+
+                        if exceeded_bw:
+                            obs, reward = self.manage_unsuccessful_action()
+                            return obs, reward, done, info
 
                         # update the resource consumption reward
                         path_length = len(psn_path) - 1
