@@ -2,7 +2,7 @@ import math
 from typing import Union, Tuple
 
 import src.spaces
-from spaces.enhanced_discrete import EnhancedDiscrete
+from spaces.discrete_with_negatives import DiscreteWithNegatives
 
 import gym
 import networkx as nx
@@ -14,13 +14,7 @@ GymObs = Union[Tuple, dict, np.ndarray, int]
 
 
 class Simulator(gym.Env):
-    """ Class implementing the network simulator (RL environment)
-
-    Attributes:
-        psn (nx.Graph): physical substrate network
-        nsprs (dict): dict of NSPRs associated to their arrival time
-        decision_maker (DecisionMaker): decision maker used to decide the next VNF to place onto the PSN
-    """
+    """ Class implementing the network simulator (RL environment) """
 
     def __init__(self, psn_file: str, nsprs_path: str):
         """ Constructor
@@ -62,7 +56,7 @@ class Simulator(gym.Env):
         ONE_BILLION = 1000000000  # constant for readability
         n_nodes = len(self.psn.nodes)
         # action space = number of servers
-        self.action_space = src.spaces.EnhancedDiscrete(len(servers_ids) + 1, start=-1)
+        self.action_space = gym.spaces.Discrete(len(servers_ids))
         self.observation_space = gym.spaces.Dict({
             # PSN STATE
             'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
@@ -212,7 +206,9 @@ class Simulator(gym.Env):
         """
         reward, done, info = 0, False, {}
 
-        if action < 0:  # it wasn't possible to place the VNF
+        # this happens only when the agent is prevented from choosing nodes that don't have enough resources,
+        # i.e., when the environment is wrapped with PreventInfeasibleActions
+        if action < 0:
             obs, reward = self.manage_unsuccessful_action()
             return obs, reward, done, info
 
@@ -348,18 +344,22 @@ class Simulator(gym.Env):
 
         :param nspr: the rejected NSPR
         """
-        for vnf_id, vnf in nspr.nodes.items():
-            # restore nodes' resources availabilities
-            if vnf['placed'] >= 0:
-                physical_node = self.psn.nodes[vnf['placed']]
-                physical_node['availCPU'] += vnf['reqCPU']
-                physical_node['availRAM'] += vnf['reqRAM']
-        for _, vl in nspr.edges.items():
-            # restore links' resources availabilities
-            if vl['placed']:
-                # if vl['placed'] is not empty, it's the list of the physical nodes traversed by the link
-                for i in range(len(vl['placed']) - 1):
-                    physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
-                    physical_link['availBW'] += vl['reqBW']
+        if self.cur_nspr is not None:
+            """ Why this if-statement is needed?
+            If this method is called, self.cur_nspr can be None only in case the environment has been
+            wrapped to prevent infeasible actions, the selected action is -1 and we finished the NSPRs. """
+            for vnf_id, vnf in nspr.nodes.items():
+                # restore nodes' resources availabilities
+                if vnf['placed'] >= 0:
+                    physical_node = self.psn.nodes[vnf['placed']]
+                    physical_node['availCPU'] += vnf['reqCPU']
+                    physical_node['availRAM'] += vnf['reqRAM']
+            for _, vl in nspr.edges.items():
+                # restore links' resources availabilities
+                if vl['placed']:
+                    # if vl['placed'] is not empty, it's the list of the physical nodes traversed by the link
+                    for i in range(len(vl['placed']) - 1):
+                        physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
+                        physical_link['availBW'] += vl['reqBW']
         # reset partial rewards
         self.reset_partial_rewards()

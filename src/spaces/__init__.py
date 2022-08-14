@@ -1,5 +1,5 @@
-from src.spaces.enhanced_discrete import EnhancedDiscrete
+from src.spaces.discrete_with_negatives import DiscreteWithNegatives
 
 __all__ = [
-    "EnhancedDiscrete",
+    "DiscreteWithNegatives",
 ]

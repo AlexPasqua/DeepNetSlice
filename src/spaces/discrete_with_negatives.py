@@ -18,15 +18,15 @@ from gym.spaces.space import Space
 from gym.utils import seeding
 
 
-class EnhancedDiscrete(Space):
+class DiscreteWithNegatives(Space):
     r"""A space consisting of finitely many elements.
 
     This class represents a finite subset of integers, more specifically a set of the form :math:`\{ a, a+1, \dots, a+n-1 \}`.
 
     Example::
 
-        >>> EnhancedDiscrete(2)            # {0, 1}
-        >>> EnhancedDiscrete(3, start=-1)  # {-1, 0, 1}
+        >>> DiscreteWithNegatives(2)            # {0, 1}
+        >>> DiscreteWithNegatives(3, start=-1)  # {-1, 0, 1}
     """
 
     def __init__(
@@ -102,13 +102,13 @@ class EnhancedDiscrete(Space):
     def __repr__(self) -> str:
         """Gives a string representation of this space."""
         if self.start != 0:
-            return "EnhancedDiscrete(%d, start=%d)" % (self.n, self.start)
-        return "EnhancedDiscrete(%d)" % self.n
+            return "DiscreteWithNegatives(%d, start=%d)" % (self.n, self.start)
+        return "DiscreteWithNegatives(%d)" % self.n
 
     def __eq__(self, other) -> bool:
         """Check whether ``other`` is equivalent to this instance."""
         return (
-            isinstance(other, EnhancedDiscrete)
+            isinstance(other, DiscreteWithNegatives)
             and self.n == other.n
             and self.start == other.start
         )

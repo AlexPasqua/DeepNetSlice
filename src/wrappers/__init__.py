@@ -1,5 +1,5 @@
-from src.wrappers.discrete_no_negative_actions import DiscreteNoNegativeActions
+from src.wrappers.prevent_infeasible_actions import PreventInfeasibleActions
 
 __all__ = [
-    "DiscreteNoNegativeActions",
+    "PreventInfeasibleActions",
 ]
