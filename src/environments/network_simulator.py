@@ -13,7 +13,7 @@ import reader
 GymObs = Union[Tuple, dict, np.ndarray, int]
 
 
-class Simulator(gym.Env):
+class NetworkSimulator(gym.Env):
     """ Class implementing the network simulator (RL environment) """
 
     def __init__(self, psn_file: str, nsprs_path: str):
@@ -21,7 +21,7 @@ class Simulator(gym.Env):
         :param psn_file: GraphML file containing the definition of the PSN
         :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
         """
-        super(Simulator, self).__init__()
+        super(NetworkSimulator, self).__init__()
 
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path  # path to the directory containing the NSPRs
@@ -75,10 +75,13 @@ class Simulator(gym.Env):
             'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
         })
 
-    def _get_observation(self, cur_vnf: Union[dict, None]) -> GymObs:
+    @property
+    def cur_vnf(self):
+        return self.cur_nspr.nodes[self.cur_vnf_id] if self.cur_nspr is not None else None
+
+    def _get_observation(self) -> GymObs:
         """ Method used to get the observation of the environment.
 
-        :param cur_vnf: current VNF being evaluated
         :return: an instance of an observation from the environment
         """
         # initialize lists
@@ -98,10 +101,10 @@ class Simulator(gym.Env):
                     bw_capacity_per_node[self._map_id_idx[node_id]] += link['availBW']
 
         # state regarding the NSPR
-        if cur_vnf is not None:
+        if self.cur_vnf is not None:
             cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=self.cur_vnf_id, nspr=self.cur_nspr)
-            nspr_state = {'cur_vnf_cpu_req': np.array([cur_vnf['reqCPU']], dtype=int),
-                          'cur_vnf_ram_req': np.array([cur_vnf['reqRAM']], dtype=int),
+            nspr_state = {'cur_vnf_cpu_req': np.array([self.cur_vnf['reqCPU']], dtype=int),
+                          'cur_vnf_ram_req': np.array([self.cur_vnf['reqRAM']], dtype=int),
                           'cur_vnf_bw_req': np.array([sum(vl['reqBW'] for vl in cur_vnf_vls.values())], dtype=int),
                           'vnfs_still_to_place': np.array([len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)}
         else:
@@ -138,6 +141,10 @@ class Simulator(gym.Env):
 
     def pick_next_nspr(self):
         """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
+        # TODO: self.nsprs is a dict with the arrival time as key and the list of VNFs as value.
+        #       Currently, we don't consider the arrival time during the agent's training,
+        #       so we just take the 'values' of the dict.
+        #       In the future we need to decide whether to consider the arrival time or not during training (and inference) and organize better the NSPRs.
         self.cur_nspr = None
         for arrival_time, nspr in self.nsprs.items():
             if self.nsprs[arrival_time]:
@@ -160,7 +167,7 @@ class Simulator(gym.Env):
         self.restore_avail_resources(nspr=self.cur_nspr)
         self.reset_partial_rewards()
         self.pick_next_nspr()
-        obs = self._get_observation(cur_vnf=self.cur_nspr.nodes[self.cur_vnf_id] if self.cur_nspr is not None else None)
+        obs = self._get_observation()
         reward = self.rval_rejected_vnf
         return obs, reward
 
@@ -173,30 +180,15 @@ class Simulator(gym.Env):
         self.nsprs = reader.read_nsprs(nsprs_path=self.nsprs_path)
 
         # reset partial rewards to be accumulated across the episodes' steps
-        self._acceptance_rewards = []
-        self._resource_consumption_rewards = []
-        self._load_balancing_rewards = []
+        self.reset_partial_rewards()
 
         # Save the first NSPR as current one to be evaluated
-        # TODO: self.nsprs is a dict with the arrival time as key and the list of VNFs as value.
-        #       Currently, we don't consider the arrival time during the agent's training,
-        #       so we just take the 'values' of the dict.
-        #       In the future we need to decide whether to consider the arrival time or not during training (and inference) and organize better the NSPRs.
-        for arrival_time, nspr in self.nsprs.items():
-            if self.nsprs[arrival_time]:
-                self.cur_nspr = self.nsprs[arrival_time].pop(0)
-                break
+        self.pick_next_nspr()
 
-        cur_vnf = None
-        if self.cur_nspr is not None:
-            self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
-            self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
-            cur_vnf = self.cur_nspr.nodes[self.cur_vnf_id]
-
-        obs = self._get_observation(cur_vnf=cur_vnf)
+        obs = self._get_observation()
         return obs
 
-    def step(self, action) -> Tuple[GymObs, float, bool, dict]:
+    def step(self, action: int) -> Tuple[GymObs, float, bool, dict]:
         """ Perform an action in the environment
 
         :param action: the action to be performed
@@ -208,26 +200,24 @@ class Simulator(gym.Env):
 
         # this happens only when the agent is prevented from choosing nodes that don't have enough resources,
         # i.e., when the environment is wrapped with PreventInfeasibleActions
-        if action < 0:
-            obs, reward = self.manage_unsuccessful_action()
-            return obs, reward, done, info
-
-        physical_node_id = self._servers_map_idx_id[action]
+        # if action < 0:
+        #     obs, reward = self.manage_unsuccessful_action()
+        #     return obs, reward, done, info
 
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
-            cur_vnf = self.cur_nspr.nodes[self.cur_vnf_id]
+            physical_node_id = self._servers_map_idx_id[action]
             physical_node = self.psn.nodes[physical_node_id]
 
-            if not self.enough_available_resources(physical_node=physical_node, vnf=cur_vnf):
+            if not self.enough_available_resources(physical_node=physical_node, vnf=self.cur_vnf):
                 # the VNF cannot be placed on the physical node
                 obs, reward = self.manage_unsuccessful_action()
                 return obs, reward, done, info
 
             # update the resources availabilities of the physical node
-            cur_vnf['placed'] = physical_node_id
-            physical_node['availCPU'] -= cur_vnf['reqCPU']
-            physical_node['availRAM'] -= cur_vnf['reqRAM']
+            self.cur_vnf['placed'] = physical_node_id
+            physical_node['availCPU'] -= self.cur_vnf['reqCPU']
+            physical_node['availRAM'] -= self.cur_vnf['reqRAM']
             # update acceptance reward and load balancing reward
             self._acceptance_rewards.append(self.rval_accepted_vnf)
             self._load_balancing_rewards.append(
@@ -258,7 +248,6 @@ class Simulator(gym.Env):
                         so we use this variable to save that the resources have been exceeded as soon as we find this to happen,
                         and only after the VL placement, if this var is True, we restore the resources availabilities. """
                         exceeded_bw = False
-
                         # place the VL onto the PSN and update the resources availabilities of the physical links involved
                         for i in range(len(psn_path) - 1):
                             physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
@@ -281,8 +270,7 @@ class Simulator(gym.Env):
                     self._resource_consumption_rewards.append(1)
                 else:
                     self._resource_consumption_rewards.append(
-                        sum(self._cur_resource_consumption_rewards) / n_VLs_placed_now
-                    )
+                        sum(self._cur_resource_consumption_rewards) / n_VLs_placed_now)
                     self._cur_resource_consumption_rewards = []
 
             # save the ID of the next VNF
@@ -295,17 +283,11 @@ class Simulator(gym.Env):
                 reward = np.stack((self._acceptance_rewards,
                                    self._resource_consumption_rewards,
                                    self._load_balancing_rewards)).prod(axis=0).sum()
-                # reset partial rewards
                 self.reset_partial_rewards()
-
-                # pick next NSPR
                 self.pick_next_nspr()
 
         # new observation
-        if self.cur_nspr is not None:
-            obs = self._get_observation(cur_vnf=self.cur_nspr.nodes[self.cur_vnf_id])
-        else:
-            obs = self._get_observation(cur_vnf=None)
+        obs = self._get_observation()
 
         return obs, reward, done, info
 
@@ -344,7 +326,7 @@ class Simulator(gym.Env):
 
         :param nspr: the rejected NSPR
         """
-        if self.cur_nspr is not None:
+        if nspr is not None:
             """ Why this if-statement is needed?
             If this method is called, self.cur_nspr can be None only in case the environment has been
             wrapped to prevent infeasible actions, the selected action is -1 and we finished the NSPRs. """
@@ -361,5 +343,3 @@ class Simulator(gym.Env):
                     for i in range(len(vl['placed']) - 1):
                         physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
                         physical_link['availBW'] += vl['reqBW']
-        # reset partial rewards
-        self.reset_partial_rewards()

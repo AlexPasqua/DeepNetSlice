@@ -2,7 +2,7 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 
-from environments.network_simulator import Simulator
+from environments.network_simulator import NetworkSimulator
 
 
 def evaluate_agent(model, env):
@@ -25,8 +25,8 @@ def evaluate_agent(model, env):
 
 
 if __name__ == '__main__':
-    env = Simulator(psn_file='../PSNs/triangle.graphml',
-                    nsprs_path='../NSPRs/dummy_NSPR_1.graphml')
+    env = NetworkSimulator(psn_file='../PSNs/triangle.graphml',
+                           nsprs_path='../NSPRs/dummy_NSPR_1.graphml')
 
     check_env(env)  # check if the environment conforms to gym's API
 

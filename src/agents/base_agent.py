@@ -18,15 +18,3 @@ class BaseAgent(BaseAlgorithm, ABC):
             support_multiple_envs: bool = False,
     ):
         super().__init__(policy, env, policy_base, learning_rate, support_multi_env=support_multiple_envs)
-
-    @staticmethod
-    def resources_reqs_satisfied(physical_node: dict, vnf: dict):
-        """ Checks whether the resources requirements of a certain VNF are satisfied by a certain physical node on the PSN
-
-        :param physical_node: physical node on the PSN
-        :param vnf: virtual network function requiring some resources
-        :return: True if the resources required by the VNF are available on the physical node, else False
-        """
-        if physical_node['availCPU'] >= vnf['reqCPU'] and physical_node['availRAM'] >= vnf['reqRAM']:
-            return True
-        return False
