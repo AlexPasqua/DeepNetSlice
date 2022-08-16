@@ -60,19 +60,19 @@ class NetworkSimulator(gym.Env):
         self.action_space = gym.spaces.Discrete(len(servers_ids))
         self.observation_space = gym.spaces.Dict({
             # PSN STATE
-            'cpu_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
-            'ram_capacities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'cpu_availabilities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'ram_availabilities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
             # for each physical node, sum of the BW of the physical links connected to it
-            'bw_capacity_per_node': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'bw_availabilities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
             # for each physical node, number of VNFs of the current NSPR placed on it
             'placement_state': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
 
             # NSPR STATE
             # note: apparently it's not possible to pass "math.inf" or "sys.maxsize" as a gym.spaces.Box's high value
-            'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
-            'cur_vnf_ram_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+            'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
+            'cur_vnf_ram_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
             # sum of the required BW of each VL connected to the current VNF
-            'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+            'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
             'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
         })
 
@@ -86,37 +86,55 @@ class NetworkSimulator(gym.Env):
         :return: an instance of an observation from the environment
         """
         # initialize lists
-        cpu_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
-        ram_capacities = np.zeros(len(self.psn.nodes), dtype=np.float32)
-        bw_capacity_per_node = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        cpu_availabilities = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        ram_availabilities = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        bw_availabilities = np.zeros(len(self.psn.nodes), dtype=np.float32)
         placement_state = np.zeros(len(self.psn.nodes), dtype=int)
 
         # TODO: this could probably be made more efficient
         # scan all nodes and save data in lists
+        max_cpu = max_ram = max_bw = 0
         for node_id, node in self.psn.nodes.items():
             # get nodes' capacities (if routers, set these to 0)
-            cpu_capacities[self._map_id_idx[node_id]] = node.get('CPUcap', 0)
-            ram_capacities[self._map_id_idx[node_id]] = node.get('RAMcap', 0)
+            cpu_availabilities[self._map_id_idx[node_id]] = node.get('availCPU', 0)
+            ram_availabilities[self._map_id_idx[node_id]] = node.get('availRAM', 0)
+            tot_bw = 0
             for extremes, link in self.psn.edges.items():
                 if node_id in extremes:
-                    bw_capacity_per_node[self._map_id_idx[node_id]] += link['availBW']
+                    bw_availabilities[self._map_id_idx[node_id]] += link['availBW']
+                    tot_bw += link['BWcap']
+            # update the max CPU / RAM / BW capacities
+            if node['CPUcap'] > max_cpu:
+                max_cpu = node['CPUcap']
+            if node['RAMcap'] > max_ram:
+                max_ram = node['RAMcap']
+            if tot_bw > max_bw:
+                max_bw = tot_bw
+
+        # normalize the quantities
+        cpu_availabilities = cpu_availabilities / max_cpu
+        ram_availabilities = ram_availabilities / max_ram
+        bw_availabilities = bw_availabilities / max_bw
 
         # state regarding the NSPR
         if self.cur_vnf is not None:
             cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=self.cur_vnf_id, nspr=self.cur_nspr)
-            nspr_state = {'cur_vnf_cpu_req': np.array([self.cur_vnf['reqCPU']], dtype=int),
-                          'cur_vnf_ram_req': np.array([self.cur_vnf['reqRAM']], dtype=int),
-                          'cur_vnf_bw_req': np.array([sum(vl['reqBW'] for vl in cur_vnf_vls.values())], dtype=int),
-                          'vnfs_still_to_place': np.array([len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)}
+            nspr_state = {
+                'cur_vnf_cpu_req': np.array([self.cur_vnf['reqCPU'] / max_cpu], dtype=float),
+                'cur_vnf_ram_req': np.array([self.cur_vnf['reqRAM'] / max_ram], dtype=float),
+                'cur_vnf_bw_req': np.array([sum(vl['reqBW'] / max_bw for vl in cur_vnf_vls.values())], dtype=float),
+                'vnfs_still_to_place': np.array([len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)}
         else:
-            nspr_state = {'cur_vnf_cpu_req': np.array([0], dtype=int), 'cur_vnf_ram_req': np.array([0], dtype=int),
-                          'cur_vnf_bw_req': np.array([0], dtype=int), 'vnfs_still_to_place': np.array([0], dtype=int)}
+            nspr_state = {'cur_vnf_cpu_req': np.array([0], dtype=int),
+                          'cur_vnf_ram_req': np.array([0], dtype=int),
+                          'cur_vnf_bw_req': np.array([0], dtype=int),
+                          'vnfs_still_to_place': np.array([0], dtype=int)}
 
         # instance of an observation from the environment
         obs = {
-            'cpu_capacities': cpu_capacities,
-            'ram_capacities': ram_capacities,
-            'bw_capacity_per_node': bw_capacity_per_node,
+            'cpu_availabilities': cpu_availabilities,
+            'ram_availabilities': ram_availabilities,
+            'bw_availabilities': bw_availabilities,
             'placement_state': placement_state,
             **nspr_state
         }
