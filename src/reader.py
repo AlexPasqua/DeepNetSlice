@@ -125,7 +125,7 @@ def read_nsprs(nsprs_path: str) -> Dict[int, List[nx.Graph]]:
     """ Reads all the NSPRs (network slice placement requests) in a directory
 
     :param nsprs_path: either path to the directory with the files defining a NSPR each or the path to a single NSPR
-    :return: a dict having as keys the various arrival times of the NSPRs and as values the NSPRs themselves
+    :return: a dict having as keys the arrival times of the NSPRs and as values the NSPRs themselves
     :raise ValueError: if nsprs_path is neither a directory nor a file
     """
     if not os.path.isdir(nsprs_path) and not os.path.isfile(nsprs_path):

@@ -26,13 +26,12 @@ class NetworkSimulator(gym.Env):
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path  # path to the directory containing the NSPRs
         self.nsprs = None  # will be initialized in the reset method
-
-        # attributes needed in the method 'step' because it has no access to observations
+        self.waiting_nsprs = []  # list of NSPRs that arrived already and are waiting to be evaluated
         self.cur_nspr = None  # used to keep track of the current NSPR being evaluated
         self.cur_nspr_unplaced_vnfs_ids = []  # used to keep track of the VNFs' IDs of the current NSPR that haven't been placed yet
         self.cur_vnf_id = None  # used to keep track of the current VNF being evaluated
-
         self._cur_vl_reqBW = 0  # auxiliary attribute needed in method 'self.compute_link_weight'
+        self.time_step = 0  # keep track of current time step
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
         nodes_ids = list(self.psn.nodes.keys())
@@ -141,18 +140,11 @@ class NetworkSimulator(gym.Env):
 
     def pick_next_nspr(self):
         """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
-        # TODO: self.nsprs is a dict with the arrival time as key and the list of VNFs as value.
-        #       Currently, we don't consider the arrival time during the agent's training,
-        #       so we just take the 'values' of the dict.
-        #       In the future we need to decide whether to consider the arrival time or not during training (and inference) and organize better the NSPRs.
-        self.cur_nspr = None
-        for arrival_time, nspr in self.nsprs.items():
-            if self.nsprs[arrival_time]:
-                self.cur_nspr = self.nsprs[arrival_time].pop(0)
-                break
-        if self.cur_nspr is not None:
-            self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
-            self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
+        if self.cur_nspr is None:
+            if self.waiting_nsprs:
+                self.cur_nspr = self.waiting_nsprs.pop(0)
+                self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
+                self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
 
     def manage_unsuccessful_action(self) -> Tuple[GymObs, int]:
         """ Method to manage an unsuccessful action, executed when a VNF/VL cannot be placed onto the PSN.
@@ -166,6 +158,7 @@ class NetworkSimulator(gym.Env):
         """
         self.restore_avail_resources(nspr=self.cur_nspr)
         self.reset_partial_rewards()
+        self.cur_nspr = None
         self.pick_next_nspr()
         obs = self._get_observation()
         reward = self.rval_rejected_vnf
@@ -176,14 +169,13 @@ class NetworkSimulator(gym.Env):
 
         :return: the starting/initial observation of the environment
         """
+        self.time_step = 0
+
         # read the NSPRs to be evaluated
         self.nsprs = reader.read_nsprs(nsprs_path=self.nsprs_path)
 
         # reset partial rewards to be accumulated across the episodes' steps
         self.reset_partial_rewards()
-
-        # Save the first NSPR as current one to be evaluated
-        self.pick_next_nspr()
 
         obs = self._get_observation()
         return obs
@@ -203,6 +195,9 @@ class NetworkSimulator(gym.Env):
         # if action < 0:
         #     obs, reward = self.manage_unsuccessful_action()
         #     return obs, reward, done, info
+
+        self.waiting_nsprs += self.nsprs.get(self.time_step, [])
+        self.pick_next_nspr()
 
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
@@ -284,10 +279,13 @@ class NetworkSimulator(gym.Env):
                                    self._resource_consumption_rewards,
                                    self._load_balancing_rewards)).prod(axis=0).sum()
                 self.reset_partial_rewards()
-                self.pick_next_nspr()
+                self.cur_nspr = None    # marked as None so a new one can be picked
 
         # new observation
         obs = self._get_observation()
+
+        # increase time step
+        self.time_step += 1
 
         return obs, reward, done, info
 
@@ -343,3 +341,6 @@ class NetworkSimulator(gym.Env):
                     for i in range(len(vl['placed']) - 1):
                         physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
                         physical_link['availBW'] += vl['reqBW']
+
+    def render(self, mode="human"):
+        raise NotImplementedError

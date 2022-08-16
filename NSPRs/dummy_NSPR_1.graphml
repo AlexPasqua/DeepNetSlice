@@ -17,7 +17,7 @@
     <graph edgedefault="undirected">
         <data key="d1">Triangle</data>
         <data key="d2">10000</data>
-        <data key="d3">0</data>
+        <data key="d3">1</data>
 
         <node id="0">
             <data key="d4">100</data>
