@@ -328,6 +328,8 @@ class NetworkSimulator(gym.Env):
                 reward = np.stack((self._acceptance_rewards,
                                    self._resource_consumption_rewards,
                                    self._load_balancing_rewards)).prod(axis=0).sum()
+                # normalize the reward to be in [0, 10] (as they do in HA-DRL)
+                reward = self._normal_reward_as_hadrl(reward)
                 self.reset_partial_rewards()
                 self.cur_nspr = None    # marked as None so a new one can be picked
 
@@ -338,6 +340,19 @@ class NetworkSimulator(gym.Env):
         self.time_step += 1
 
         return obs, reward, done, info
+
+    def _normal_reward_as_hadrl(self, reward):
+        """ Normalize the reward to be in [0, 10] (as they do in HA-DRL) """
+        # since the global reward is given by the sum for each time step of the
+        # current NSPR (i.e. for each VNF in the NSPR) of the product of the 3
+        # partial rewards at time t,
+        # the maximum possible reward for the given NSPR is given by:
+        #   the number of VNF in the NSPR times
+        #   the maximum acceptance reward value (i.e. every VNF is accepted) times
+        #   the maximum resource consumption reward value (i.e. 1) times
+        #   the maximum load balancing reward value (i.e. 1+1=2)
+        max_reward = len(self.cur_nspr.nodes) * self.rval_accepted_vnf * 1 * 2
+        return reward / max_reward * 10
 
     @staticmethod
     def get_cur_vnf_vls(vnf_id: int, nspr: nx.Graph) -> dict:

@@ -19,17 +19,17 @@
         <node id="0">
             <data key="d2">server</data>
             <data key="d3">2000</data>
-            <data key="d4">100</data>
+            <data key="d4">1000</data>
         </node>
         <node id="1">
             <data key="d2">server</data>
             <data key="d3">1000</data>
-            <data key="d4">100</data>
+            <data key="d4">1000</data>
         </node>
         <node id="2">
             <data key="d2">server</data>
             <data key="d3">200</data>
-            <data key="d4">10</data>
+            <data key="d4">100</data>
         </node>
 
         <edge source="0" target="1">
@@ -37,11 +37,11 @@
             <data key="d6">5</data>
         </edge>
         <edge source="1" target="2">
-            <data key="d5">100</data>
+            <data key="d5">1000</data>
             <data key="d6">5</data>
         </edge>
         <edge source="2" target="0">
-            <data key="d5">100</data>
+            <data key="d5">1000</data>
             <data key="d6">5</data>
         </edge>
     </graph>
