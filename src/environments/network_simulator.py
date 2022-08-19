@@ -16,16 +16,27 @@ GymObs = Union[Tuple, dict, np.ndarray, int]
 class NetworkSimulator(gym.Env):
     """ Class implementing the network simulator (RL environment) """
 
-    def __init__(self, psn_file: str, nsprs_path: str):
+    def __init__(self,
+                 psn_file: str,
+                 nsprs_path: str,
+                 max_nsprs_per_episode: int = None,
+                 max_steps_per_episode: int = None):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
         :param nsprs_path: either directory with the GraphML files defining the
             NSPRs or path to a single GraphML file
+        :param max_nsprs_per_episode: max number of NSPRs to be evaluated
+            in each episode. If None, there is no limit.
+        :param max_steps_per_episode: max number of steps in each episode.
+            If None, there is no limit.
         """
         super(NetworkSimulator, self).__init__()
 
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
-        self.nsprs_path = nsprs_path  # path to the directory containing the NSPRs
+        self.nsprs_path = nsprs_path
+        self.max_nsprs_per_episode = max_nsprs_per_episode
+        self.nsprs_seen_in_cur_ep = 0
+        self.max_steps_per_episode = max_steps_per_episode
         self.nsprs = None  # will be initialized in the reset method
         self.waiting_nsprs = []  # list of NSPRs that arrived already and are waiting to be evaluated
         self.cur_nspr = None  # used to keep track of the current NSPR being evaluated
@@ -79,6 +90,137 @@ class NetworkSimulator(gym.Env):
     @property
     def cur_vnf(self):
         return self.cur_nspr.nodes[self.cur_vnf_id] if self.cur_nspr is not None else None
+
+    def reset_partial_rewards(self):
+        """ Resets the partial rewards (used in case a NSPR cannot be placed) """
+        self._acceptance_rewards = []
+        self._resource_consumption_rewards = []
+        self._load_balancing_rewards = []
+
+    @staticmethod
+    def enough_avail_resources(physical_node: dict, vnf: dict) -> bool:
+        """ Check that the physical node has enough resources to satisfy the VNF's requirements
+
+        :param physical_node: physical node to check
+        :param vnf: VNF to check
+        :return: True if the physical node has enough resources to satisfy the VNF's requirements, False otherwise
+        """
+        if physical_node['availCPU'] < vnf['reqCPU'] or physical_node['availRAM'] < vnf['reqRAM']:
+            return False
+        return True
+
+    def restore_avail_resources(self, nspr: nx.Graph):
+        """ Method called in case a NSPR is not accepted, or it has reached
+        its departure time.
+        Restores the PSN resources occupied by that NSPR.
+
+        :param nspr: the rejected NSPR
+        """
+        if nspr is not None:
+            nspr.graph['departed'] = True
+            for vnf_id, vnf in nspr.nodes.items():
+                # restore nodes' resources availabilities
+                if vnf['placed'] >= 0:
+                    physical_node = self.psn.nodes[vnf['placed']]
+                    physical_node['availCPU'] += vnf['reqCPU']
+                    physical_node['availRAM'] += vnf['reqRAM']
+            for _, vl in nspr.edges.items():
+                # restore links' resources availabilities
+                if vl['placed']:
+                    # vl['placed'] is the list of the physical nodes traversed by the link
+                    for i in range(len(vl['placed']) - 1):
+                        physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
+                        physical_link['availBW'] += vl['reqBW']
+
+    def pick_next_nspr(self):
+        """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
+        nspr_is_new = False
+        if self.cur_nspr is None and self.waiting_nsprs:
+            self.cur_nspr = self.waiting_nsprs.pop(0)
+            self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
+            self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
+            nspr_is_new = True
+        return nspr_is_new
+
+    def check_for_departed_nsprs(self):
+        """ Checks it some NSPRs have reached their departure time and in case
+        it frees the PSN resources occupied by them. """
+        all_arrival_times = list(self.nsprs.keys())
+        all_arrival_times.sort()
+        for arrival_time in all_arrival_times:
+            if arrival_time >= self.time_step:
+                break
+            cur_nspr = self.nsprs[arrival_time]
+            for nspr in cur_nspr:
+                departed = nspr.graph.get('departed', False)
+                if nspr.graph['DepartureTime'] <= self.time_step and not departed:
+                    self.restore_avail_resources(nspr=nspr)
+                    if nspr == self.cur_nspr:
+                        # haven't finished placing this NSPR, but its departure time has come.
+                        # remove NSPR, no reward, neither positive nor negative
+                        # (not agent's fault, too many requests at the same time)
+                        self.cur_nspr = None
+                        self.reset_partial_rewards()
+
+    def manage_unsuccessful_action(self) -> Tuple[GymObs, int]:
+        """ Method to manage an unsuccessful action, executed when a VNF/VL cannot be placed onto the PSN.
+        - Restore the PSN resources occupied by VNFs and VLs of the current NSPR
+        - Reset the partial rewards
+        - Set the reward as the one for an unsuccessful action
+        - Pick the next NSPR to be evaluated (if exists)
+        - get an observation from the environment
+
+        :return: the reward for the unsuccessful action
+        """
+        self.restore_avail_resources(nspr=self.cur_nspr)
+        self.reset_partial_rewards()
+        self.cur_nspr = None
+        self.pick_next_nspr()
+        obs = self._get_observation()
+        reward = self.rval_rejected_vnf
+        return obs, reward
+
+    def _normal_reward_as_hadrl(self, reward):
+        """ Normalize the reward to be in [0, 10] (as they do in HA-DRL) """
+        # since the global reward is given by the sum for each time step of the
+        # current NSPR (i.e. for each VNF in the NSPR) of the product of the 3
+        # partial rewards at time t,
+        # the maximum possible reward for the given NSPR is given by:
+        #   the number of VNF in the NSPR times
+        #   the maximum acceptance reward value (i.e. every VNF is accepted) times
+        #   the maximum resource consumption reward value (i.e. 1) times
+        #   the maximum load balancing reward value (i.e. 1+1=2)
+        max_reward = len(self.cur_nspr.nodes) * self.rval_accepted_vnf * 1 * 2
+        return reward / max_reward * 10
+
+    @staticmethod
+    def get_cur_vnf_vls(vnf_id: int, nspr: nx.Graph) -> dict:
+        """ Get all the virtual links connected to a specific VNF
+
+        :param vnf_id: ID of a VNF whose VLs have to be returned
+        :param nspr: the NSPR to which the VNF belongs
+        :return: dict of the VLs connected to the specified VNF
+        """
+        vnf_links = {}
+        for extremes, vl in nspr.edges.items():
+            if vnf_id in extremes:
+                vnf_links[extremes] = vl
+        return vnf_links
+
+    def compute_link_weight(self, source: int, target: int, link: dict):
+        """ Compute the weight of an edge between two nodes.
+        If the edge satisfies the bandwidth requirement, the weight is 1, else infinity.
+
+        This method is passed to networkx's shortest_path function as a weight function, and it's subject to networkx's API.
+        It must take exactly 3 arguments: the two endpoints of an edge and the dictionary of edge attributes for that edge.
+        We need the required bandwidth to compute an edge's weight, so we save it into an attribute of the simulator (self._cur_vl_reqBW).
+
+        :param source: source node in the PSN
+        :param target: target node in the PSN
+        :param link: dict of the link's (source - target) attributes
+        :return: the weight of that link
+        """
+        return 1 if link['availBW'] >= self._cur_vl_reqBW else math.inf
 
     def _get_observation(self) -> GymObs:
         """ Method used to get the observation of the environment.
@@ -140,76 +282,13 @@ class NetworkSimulator(gym.Env):
         }
         return obs
 
-    def reset_partial_rewards(self):
-        """ Resets the partial rewards (used in case a NSPR cannot be placed) """
-        self._acceptance_rewards = []
-        self._resource_consumption_rewards = []
-        self._load_balancing_rewards = []
-
-    @staticmethod
-    def enough_avail_resources(physical_node: dict, vnf: dict) -> bool:
-        """ Check that the physical node has enough resources to satisfy the VNF's requirements
-
-        :param physical_node: physical node to check
-        :param vnf: VNF to check
-        :return: True if the physical node has enough resources to satisfy the VNF's requirements, False otherwise
-        """
-        if physical_node['availCPU'] < vnf['reqCPU'] or physical_node['availRAM'] < vnf['reqRAM']:
-            return False
-        return True
-
-    def pick_next_nspr(self):
-        """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
-        if self.cur_nspr is None:
-            if self.waiting_nsprs:
-                self.cur_nspr = self.waiting_nsprs.pop(0)
-                self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
-                self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
-
-    def check_for_departed_nsprs(self):
-        """ Checks it some NSPRs have reached their departure time and in case
-        it frees the PSN resources occupied by them. """
-        all_arrival_times = list(self.nsprs.keys())
-        all_arrival_times.sort()
-        for arrival_time in all_arrival_times:
-            if arrival_time >= self.time_step:
-                break
-            cur_nspr = self.nsprs[arrival_time]
-            for nspr in cur_nspr:
-                departed = nspr.graph.get('departed', False)
-                if nspr.graph['DepartureTime'] <= self.time_step and not departed:
-                    self.restore_avail_resources(nspr=nspr)
-                    if nspr == self.cur_nspr:
-                        # haven't finished placing this NSPR, but its departure time has come.
-                        # remove NSPR, no reward, neither positive nor negative
-                        # (not agent's fault, too many requests at the same time)
-                        self.cur_nspr = None
-                        self.reset_partial_rewards()
-
-    def manage_unsuccessful_action(self) -> Tuple[GymObs, int]:
-        """ Method to manage an unsuccessful action, executed when a VNF/VL cannot be placed onto the PSN.
-        - Restore the PSN resources occupied by VNFs and VLs of the current NSPR
-        - Reset the partial rewards
-        - Set the reward as the one for an unsuccessful action
-        - Pick the next NSPR to be evaluated (if exists)
-        - get an observation from the environment
-
-        :return: the reward for the unsuccessful action
-        """
-        self.restore_avail_resources(nspr=self.cur_nspr)
-        self.reset_partial_rewards()
-        self.cur_nspr = None
-        self.pick_next_nspr()
-        obs = self._get_observation()
-        reward = self.rval_rejected_vnf
-        return obs, reward
-
     def reset(self) -> GymObs:
         """ Method used to reset the environment
 
         :return: the starting/initial observation of the environment
         """
         self.time_step = 0
+        self.nsprs_seen_in_cur_ep = 0
 
         # read the NSPRs to be evaluated
         self.nsprs = reader.read_nsprs(nsprs_path=self.nsprs_path)
@@ -239,7 +318,11 @@ class NetworkSimulator(gym.Env):
 
         self.check_for_departed_nsprs()
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
-        self.pick_next_nspr()
+        picked_new_nspr = self.pick_next_nspr()
+        if picked_new_nspr and self.max_nsprs_per_episode is not None:
+            self.nsprs_seen_in_cur_ep += 1
+            if self.nsprs_seen_in_cur_ep >= self.max_nsprs_per_episode:
+                done = True
 
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
@@ -338,73 +421,11 @@ class NetworkSimulator(gym.Env):
 
         # increase time step
         self.time_step += 1
+        if self.max_steps_per_episode is not None and \
+                self.time_step % self.max_steps_per_episode == 0:
+            done = True
 
         return obs, reward, done, info
-
-    def _normal_reward_as_hadrl(self, reward):
-        """ Normalize the reward to be in [0, 10] (as they do in HA-DRL) """
-        # since the global reward is given by the sum for each time step of the
-        # current NSPR (i.e. for each VNF in the NSPR) of the product of the 3
-        # partial rewards at time t,
-        # the maximum possible reward for the given NSPR is given by:
-        #   the number of VNF in the NSPR times
-        #   the maximum acceptance reward value (i.e. every VNF is accepted) times
-        #   the maximum resource consumption reward value (i.e. 1) times
-        #   the maximum load balancing reward value (i.e. 1+1=2)
-        max_reward = len(self.cur_nspr.nodes) * self.rval_accepted_vnf * 1 * 2
-        return reward / max_reward * 10
-
-    @staticmethod
-    def get_cur_vnf_vls(vnf_id: int, nspr: nx.Graph) -> dict:
-        """ Get all the virtual links connected to a specific VNF
-
-        :param vnf_id: ID of a VNF whose VLs have to be returned
-        :param nspr: the NSPR to which the VNF belongs
-        :return: dict of the VLs connected to the specified VNF
-        """
-        vnf_links = {}
-        for extremes, vl in nspr.edges.items():
-            if vnf_id in extremes:
-                vnf_links[extremes] = vl
-        return vnf_links
-
-    def compute_link_weight(self, source: int, target: int, link: dict):
-        """ Compute the weight of an edge between two nodes.
-        If the edge satisfies the bandwidth requirement, the weight is 1, else infinity.
-
-        This method is passed to networkx's shortest_path function as a weight function, and it's subject to networkx's API.
-        It must take exactly 3 arguments: the two endpoints of an edge and the dictionary of edge attributes for that edge.
-        We need the required bandwidth to compute an edge's weight, so we save it into an attribute of the simulator (self._cur_vl_reqBW).
-
-        :param source: source node in the PSN
-        :param target: target node in the PSN
-        :param link: dict of the link's (source - target) attributes
-        :return: the weight of that link
-        """
-        return 1 if link['availBW'] >= self._cur_vl_reqBW else math.inf
-
-    def restore_avail_resources(self, nspr: nx.Graph):
-        """ Method called in case a NSPR is not accepted, or it has reached
-        its departure time.
-        Restores the PSN resources occupied by that NSPR.
-
-        :param nspr: the rejected NSPR
-        """
-        if nspr is not None:
-            nspr.graph['departed'] = True
-            for vnf_id, vnf in nspr.nodes.items():
-                # restore nodes' resources availabilities
-                if vnf['placed'] >= 0:
-                    physical_node = self.psn.nodes[vnf['placed']]
-                    physical_node['availCPU'] += vnf['reqCPU']
-                    physical_node['availRAM'] += vnf['reqRAM']
-            for _, vl in nspr.edges.items():
-                # restore links' resources availabilities
-                if vl['placed']:
-                    # vl['placed'] is the list of the physical nodes traversed by the link
-                    for i in range(len(vl['placed']) - 1):
-                        physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
-                        physical_link['availBW'] += vl['reqBW']
 
     def render(self, mode="human"):
         raise NotImplementedError
