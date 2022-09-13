@@ -3,6 +3,7 @@ from stable_baselines3 import A2C
 from torch import nn
 
 from environments.network_simulator import NetworkSimulator
+from policies.hadrl_policy import HADRLPolicy
 from policy_nets import HADRLFeaturesExtractor
 
 if __name__ == '__main__':
@@ -19,17 +20,23 @@ if __name__ == '__main__':
     # env = make_vec_env(lambda: env, n_envs=1)
 
     n_nodes = len(env.psn.nodes)
-    model = A2C('MultiInputPolicy', env, verbose=1,
+    # model = A2C('MultiInputPolicy', env, verbose=1,
+    #             policy_kwargs=dict(
+    #                 activation_fn=torch.nn.Tanh,
+    #                 net_arch=[n_nodes, dict(pi=[n_nodes], vf=[1])],
+    #                 features_extractor_class=HADRLFeaturesExtractor,
+    #                 features_extractor_kwargs=dict(
+    #                     psn=env.psn,
+    #                     activation=nn.functional.relu
+    #                 )
+    #             ),
+    #             device='cpu',
+    #             )
+
+    model = A2C(policy=HADRLPolicy, env=env, verbose=1, device='cpu',
                 policy_kwargs=dict(
-                    activation_fn=torch.nn.Tanh,
-                    net_arch=[n_nodes, dict(pi=[n_nodes], vf=[1])],
-                    features_extractor_class=HADRLFeaturesExtractor,
-                    features_extractor_kwargs=dict(
-                        psn=env.psn,
-                        activation=nn.functional.relu
-                    )
-                ),
-                device='cpu')
+                    psn=env.psn
+                ))
 
     print(model.policy)
 
