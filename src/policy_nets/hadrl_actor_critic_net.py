@@ -12,7 +12,7 @@ class HADRLActor(nn.Module):
     def __init__(self, observation_space: gym.Space, psn: nx.Graph, gcn_out_channels: int = 60,
                  nspr_out_features: int = 4):
         super().__init__()
-        self.features_extractor = HADRLFeaturesExtractor(observation_space, psn, nn.Tanh, gcn_out_channels, nspr_out_features)
+        # self.features_extractor = HADRLFeaturesExtractor(observation_space, psn, nn.Tanh, gcn_out_channels, nspr_out_features)
 
         n_nodes = len(psn.nodes)
         self.final_fcs = nn.Sequential(
@@ -21,19 +21,19 @@ class HADRLActor(nn.Module):
 
             # TODO: put the heuristics here
 
-            nn.Softmax()
+            nn.Softmax(dim=1)
         )
 
     def forward(self, x):
-        features = self.features_extractor(x)
-        return self.final_fcs(features)
+        # x = self.features_extractor(x)
+        return self.final_fcs(x)
 
 
 class HSDRLCritic(nn.Module):
     def __init__(self, observation_space: gym.Space, psn: nx.Graph, gcn_out_channels: int = 60,
                  nspr_out_features: int = 4):
         super().__init__()
-        self.features_extractor = HADRLFeaturesExtractor(observation_space, psn, nn.ReLU, gcn_out_channels, nspr_out_features)
+        # self.features_extractor = HADRLFeaturesExtractor(observation_space, psn, nn.ReLU, gcn_out_channels, nspr_out_features)
 
         n_nodes = len(psn.nodes)
         self.final_fcs = nn.Sequential(
@@ -44,8 +44,8 @@ class HSDRLCritic(nn.Module):
         )
 
     def forward(self, x):
-        features = self.features_extractor(x)
-        return self.final_fcs(features)
+        # x = self.features_extractor(x)
+        return self.final_fcs(x)
 
 
 class HADRLActorCriticNet(nn.Module):

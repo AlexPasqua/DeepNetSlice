@@ -35,7 +35,12 @@ if __name__ == '__main__':
 
     model = A2C(policy=HADRLPolicy, env=env, verbose=1, device='cpu',
                 policy_kwargs=dict(
-                    psn=env.psn
+                    psn=env.psn,
+                    features_extractor_class=HADRLFeaturesExtractor,
+                    features_extractor_kwargs=dict(
+                        psn=env.psn,
+                        activation=nn.functional.relu
+                    )
                 ))
 
     print(model.policy)
