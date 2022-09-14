@@ -18,7 +18,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
             self,
             observation_space: gym.Space,
             psn: nx.Graph,
-            activation_fn: nn.functional,
+            activation_fn: th,
             gcn_out_channels: int = 60,
             nspr_out_features: int = 4
     ):
@@ -26,7 +26,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
 
         :param observation_space: the observation space of the agent using this feature extractor
         :param psn: the PSN graph of the environment which the agent acts upon
-        :param activation_fn: activation function to be used
+        :param activation_fn: activation function to be used (e.g. torch.relu)
         :param gcn_out_channels: dimension of the features vector of each node after the GCN
         :param nspr_out_features: dimension of the features vector of the NSPR state
         """
