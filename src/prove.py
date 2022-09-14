@@ -27,7 +27,7 @@ if __name__ == '__main__':
     #                 features_extractor_class=HADRLFeaturesExtractor,
     #                 features_extractor_kwargs=dict(
     #                     psn=env.psn,
-    #                     activation=nn.functional.relu
+    #                     activation_fn=nn.functional.relu
     #                 )
     #             ),
     #             device='cpu',
@@ -42,7 +42,7 @@ if __name__ == '__main__':
                     features_extractor_class=HADRLFeaturesExtractor,
                     features_extractor_kwargs=dict(
                         psn=env.psn,
-                        activation=nn.functional.relu
+                        activation_fn=nn.functional.relu
                     )
                 ))
 
