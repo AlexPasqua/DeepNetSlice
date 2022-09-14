@@ -19,9 +19,11 @@ class HADRLActor(nn.Module):
             nn.Linear(in_features=n_nodes * gcn_out_channels + nspr_out_features,
                       out_features=n_nodes),
 
+            nn.Tanh(),
+
             # TODO: put the heuristics here
 
-            nn.Softmax(dim=1)
+            # nn.Softmax(dim=1)
         )
 
     def forward(self, x):

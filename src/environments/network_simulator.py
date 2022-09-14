@@ -246,12 +246,13 @@ class NetworkSimulator(gym.Env):
                     bw_availabilities[self._map_id_idx[node_id]] += link['availBW']
                     tot_bw += link['BWcap']
             # update the max CPU / RAM / BW capacities
-            if node['CPUcap'] > max_cpu:
-                max_cpu = node['CPUcap']
-            if node['RAMcap'] > max_ram:
-                max_ram = node['RAMcap']
-            if tot_bw > max_bw:
-                max_bw = tot_bw
+            if node['NodeType'] == 'server':
+                if node['CPUcap'] > max_cpu:
+                    max_cpu = node['CPUcap']
+                if node['RAMcap'] > max_ram:
+                    max_ram = node['RAMcap']
+                if tot_bw > max_bw:
+                    max_bw = tot_bw
 
         # normalize the quantities
         cpu_availabilities = cpu_availabilities / max_cpu

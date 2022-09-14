@@ -10,10 +10,10 @@ if __name__ == '__main__':
     # env = make_vec_env("CartPole-v1", n_envs=4)
 
     # model = A2C("MlpPolicy", env, verbose=1)
-    env = NetworkSimulator(psn_file='../PSNs/triangle.graphml',
+    env = NetworkSimulator(psn_file='../PSNs/servers_box_with_central_router.graphml',
                            nsprs_path='../NSPRs/',
-                           max_nsprs_per_episode=2,
-                           max_steps_per_episode=100)
+                           max_nsprs_per_episode=1,
+                           max_steps_per_episode=10)
 
     # env = PreventInfeasibleActions(env)
 
@@ -34,8 +34,8 @@ if __name__ == '__main__':
     #             )
 
     model = A2C(policy=HADRLPolicy, env=env, verbose=1, device='cpu',
-                learning_rate=0.001,
-                n_steps=1,  # per ora abbiamo pochi nodi (tipo 3), quindi facciamo un update dopo ogni step
+                learning_rate=0.00001,
+                n_steps=5,  # per ora abbiamo pochi nodi (tipo 3), quindi facciamo un update dopo ogni step
                 gamma=0.99,
                 policy_kwargs=dict(
                     psn=env.psn,
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     print(model.policy)
 
-    model.learn(total_timesteps=100, log_interval=1)
+    model.learn(total_timesteps=10000, log_interval=10)
     exit()
 
     # obs = env.reset()

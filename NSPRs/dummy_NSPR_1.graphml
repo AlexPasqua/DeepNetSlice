@@ -22,12 +22,12 @@
         <data key="d4">5</data>
 
         <node id="0">
-            <data key="d5">100</data>
-            <data key="d6">500</data>
+            <data key="d5">10</data>
+            <data key="d6">5</data>
         </node>
         <node id="1">
-            <data key="d5">50</data>
-            <data key="d6">100</data>
+            <data key="d5">5</data>
+            <data key="d6">10</data>
         </node>
         <node id="2">
             <data key="d5">5</data>
@@ -35,15 +35,15 @@
         </node>
 
         <edge source="0" target="1">
-            <data key="d7">100</data>
+            <data key="d7">10</data>
             <data key="d8">10</data>
         </edge>
         <edge source="1" target="2">
-            <data key="d7">100</data>
+            <data key="d7">10</data>
             <data key="d8">10</data>
         </edge>
         <edge source="2" target="0">
-            <data key="d7">100</data>
+            <data key="d7">10</data>
             <data key="d8">10</data>
         </edge>
     </graph>
