@@ -14,7 +14,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
     https://ieeexplore.ieee.org/document/9632824
     """
 
-    def __init__(self, observation_space: gym.Space, psn: nx.Graph,  activation: nn.functional,
+    def __init__(self, observation_space: gym.Space, psn: nx.Graph, activation: nn.functional,
                  gcn_out_channels: int = 60, nspr_out_features: int = 4):
         """ Constructor
 
@@ -49,7 +49,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         psn_state[:, :, 2] = observations['bw_availabilities']
         psn_state[:, :, 3] = observations['placement_state']
         gcn_out = self.graph_conv(psn_state, self.edge_index).flatten(start_dim=1)
-        gcn_out = self.activation(gcn_out)
+        # gcn_out = self.activation(gcn_out)
 
         # features extraction of the NSPR state
         nspr_state = th.empty(size=(len_rollout_buffer, 1, self.n_features), dtype=th.float)
@@ -58,9 +58,10 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         nspr_state[:, :, 2] = observations['cur_vnf_bw_req']
         nspr_state[:, :, 3] = observations['vnfs_still_to_place']
         nspr_fc_out = self.nspr_fc(nspr_state.flatten(start_dim=1))
-        nspr_fc_out = self.activation(nspr_fc_out)
+        # nspr_fc_out = self.activation(nspr_fc_out)
 
         # concatenation of the two features vectors
         global_out = th.cat((gcn_out, nspr_fc_out), dim=1)
+        global_out = self.activation(global_out)
 
         return global_out

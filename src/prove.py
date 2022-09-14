@@ -34,6 +34,9 @@ if __name__ == '__main__':
     #             )
 
     model = A2C(policy=HADRLPolicy, env=env, verbose=1, device='cpu',
+                learning_rate=0.001,
+                n_steps=1,  # per ora abbiamo pochi nodi (tipo 3), quindi facciamo un update dopo ogni step
+                gamma=0.99,
                 policy_kwargs=dict(
                     psn=env.psn,
                     features_extractor_class=HADRLFeaturesExtractor,
@@ -45,14 +48,14 @@ if __name__ == '__main__':
 
     print(model.policy)
 
-    model.learn(total_timesteps=25000, log_interval=100)
+    model.learn(total_timesteps=100, log_interval=1)
     exit()
 
-    obs = env.reset()
-    while True:
-        action, _states = model.predict(obs)
-        print(action)
-        obs, rewards, done, info = env.step(action)
-        if done:
-            env.reset()
+    # obs = env.reset()
+    # while True:
+    #     action, _states = model.predict(obs)
+    #     print(action)
+    #     obs, rewards, done, info = env.step(action)
+    #     if done:
+    #         env.reset()
         # env.render()
