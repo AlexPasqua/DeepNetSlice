@@ -4,7 +4,7 @@ from torch import nn
 
 from environments.network_simulator import NetworkSimulator
 from policies.hadrl_policy import HADRLPolicy
-from policy_nets import HADRLFeaturesExtractor
+from policies.features_extractors import HADRLFeaturesExtractor
 
 if __name__ == '__main__':
     # env = make_vec_env("CartPole-v1", n_envs=4)

@@ -5,7 +5,7 @@ import networkx as nx
 from stable_baselines3.common.policies import MultiInputActorCriticPolicy
 from torch import nn
 
-from src.policy_nets.hadrl_actor_critic_net import HADRLActorCriticNet
+from .mlp_extractors.hadrl_mlp_extractor import HADRLActorCriticNet
 
 
 class HADRLPolicy(MultiInputActorCriticPolicy):

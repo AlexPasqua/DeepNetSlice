@@ -5,7 +5,7 @@ import networkx as nx
 import torch as th
 from torch import nn
 
-from policy_nets import HADRLFeaturesExtractor
+from policies.features_extractors import HADRLFeaturesExtractor
 
 
 class HADRLActor(nn.Module):
