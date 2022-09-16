@@ -44,6 +44,11 @@ class NetworkSimulator(gym.Env):
         self.cur_vnf_id = None  # used to keep track of the current VNF being evaluated
         self._cur_vl_reqBW = 0  # auxiliary attribute needed in method 'self.compute_link_weight'
         self.time_step = 0  # keep track of current time step
+        self.ep_number = 0  # keep track of current episode number
+        self.seen_nsprs = 0  # keep track of the number of NSPRs seen so far
+        self.accepted_nsprs = 0  # for the overall acceptance ratio
+        self.accepted_nsprs_by_ep = {}  # key: episode number, value: list[accepted, total]
+        self.accepted_nsprs_by_step = []  # list of time steps in which an NSPR was accepted
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
         nodes_ids = list(self.psn.nodes.keys())
@@ -288,7 +293,8 @@ class NetworkSimulator(gym.Env):
 
         :return: the starting/initial observation of the environment
         """
-        self.time_step = 0
+        self.time_step += 1
+        self.ep_number += 1
         self.nsprs_seen_in_cur_ep = 0
 
         # read the NSPRs to be evaluated
@@ -321,6 +327,7 @@ class NetworkSimulator(gym.Env):
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
         picked_new_nspr = self.pick_next_nspr()
         if picked_new_nspr and self.max_nsprs_per_episode is not None:
+            self.seen_nsprs += 1
             self.nsprs_seen_in_cur_ep += 1
             if self.nsprs_seen_in_cur_ep >= self.max_nsprs_per_episode:
                 done = True
@@ -407,7 +414,7 @@ class NetworkSimulator(gym.Env):
                 self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
                 reward = 0  # global reward is non-zero only after the whole NSPR is placed
             else:
-                # it means we finished the VNFs of the current NSPR, so...
+                # it means we finished the VNFs of the current NSPR
                 # update global reward because the NSPR is fully placed
                 reward = np.stack((self._acceptance_rewards,
                                    self._resource_consumption_rewards,
@@ -416,6 +423,14 @@ class NetworkSimulator(gym.Env):
                 reward = self._normal_reward_as_hadrl(reward)
                 self.reset_partial_rewards()
                 self.cur_nspr = None    # marked as None so a new one can be picked
+                # update the acceptance ratio
+                self.accepted_nsprs += 1
+                self.accepted_nsprs_by_step.append(self.time_step)
+                if self.ep_number in self.accepted_nsprs_by_ep:
+                    self.accepted_nsprs_by_ep[self.ep_number][0] += 1
+                    self.accepted_nsprs_by_ep[self.ep_number][1] = self.nsprs_seen_in_cur_ep
+                else:
+                    self.accepted_nsprs_by_ep[self.ep_number] = [1, self.nsprs_seen_in_cur_ep]
 
         # new observation
         obs = self._get_observation()

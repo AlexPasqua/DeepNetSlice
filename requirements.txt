@@ -1,4 +1,4 @@
-networkx==2.8.4
-numpy==1.23.0
-gym==0.21.0
-torch==1.12.0
+numpy~=1.23.0
+gym~=0.21.0
+networkx~=2.8.4
+torch~=1.12.0

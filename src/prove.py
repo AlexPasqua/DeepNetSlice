@@ -1,7 +1,10 @@
 import torch
 from stable_baselines3 import A2C
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 from torch import nn
 
+from callbacks import AcceptanceRatioCallback
 from environments.network_simulator import NetworkSimulator
 from policies.hadrl_policy import HADRLPolicy
 from policies.features_extractors import HADRLFeaturesExtractor
@@ -12,10 +15,8 @@ if __name__ == '__main__':
     # model = A2C("MlpPolicy", env, verbose=1)
     env = NetworkSimulator(psn_file='../PSNs/servers_box_with_central_router.graphml',
                            nsprs_path='../NSPRs/',
-                           max_nsprs_per_episode=1,
+                           max_nsprs_per_episode=10,
                            max_steps_per_episode=10)
-
-    # env = PreventInfeasibleActions(env)
 
     # env = make_vec_env(lambda: env, n_envs=1)
 
@@ -33,10 +34,12 @@ if __name__ == '__main__':
     #             device='cpu',
     #             )
 
-    model = A2C(policy=HADRLPolicy, env=env, verbose=1, device='cpu',
-                learning_rate=0.00001,
-                n_steps=5,  # per ora abbiamo pochi nodi (tipo 3), quindi facciamo un update dopo ogni step
+    model = A2C(policy=HADRLPolicy, env=env, verbose=2, device='cpu',
+                learning_rate=0.0001,
+                n_steps=5,  # ogni quanti step fare un update
                 gamma=0.99,
+                ent_coef=0.5,
+                tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=env.psn,
                     features_extractor_class=HADRLFeaturesExtractor,
@@ -48,7 +51,7 @@ if __name__ == '__main__':
 
     print(model.policy)
 
-    model.learn(total_timesteps=10000, log_interval=10)
+    model.learn(total_timesteps=1000, log_interval=10, callback=AcceptanceRatioCallback())
     exit()
 
     # obs = env.reset()
