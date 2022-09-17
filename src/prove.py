@@ -51,7 +51,8 @@ if __name__ == '__main__':
 
     print(model.policy)
 
-    model.learn(total_timesteps=1000, log_interval=10, callback=AcceptanceRatioCallback())
+    model.learn(total_timesteps=1000, log_interval=10,
+                callback=AcceptanceRatioCallback(verbose=1))
     exit()
 
     # obs = env.reset()

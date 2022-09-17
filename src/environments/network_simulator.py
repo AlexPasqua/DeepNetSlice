@@ -45,7 +45,7 @@ class NetworkSimulator(gym.Env):
         self._cur_vl_reqBW = 0  # auxiliary attribute needed in method 'self.compute_link_weight'
         self.time_step = 0  # keep track of current time step
         self.ep_number = 0  # keep track of current episode number
-        self.seen_nsprs = 0  # keep track of the number of NSPRs seen so far
+        self.tot_nsprs = 0  # keep track of the number of NSPRs seen so far
         self.accepted_nsprs = 0  # for the overall acceptance ratio
         self.accepted_nsprs_by_ep = {}  # key: episode number, value: list[accepted, total]
         self.accepted_nsprs_by_step = []  # list of time steps in which an NSPR was accepted
@@ -327,7 +327,7 @@ class NetworkSimulator(gym.Env):
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
         picked_new_nspr = self.pick_next_nspr()
         if picked_new_nspr and self.max_nsprs_per_episode is not None:
-            self.seen_nsprs += 1
+            self.tot_nsprs += 1
             self.nsprs_seen_in_cur_ep += 1
             if self.nsprs_seen_in_cur_ep >= self.max_nsprs_per_episode:
                 done = True
