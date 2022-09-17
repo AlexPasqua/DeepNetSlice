@@ -47,8 +47,6 @@ class NetworkSimulator(gym.Env):
         self.ep_number = 0  # keep track of current episode number
         self.tot_nsprs = 0  # keep track of the number of NSPRs seen so far
         self.accepted_nsprs = 0  # for the overall acceptance ratio
-        self.accepted_nsprs_by_ep = {}  # key: episode number, value: list[accepted, total]
-        self.accepted_nsprs_by_step = []  # list of time steps in which an NSPR was accepted
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
         nodes_ids = list(self.psn.nodes.keys())
@@ -293,7 +291,6 @@ class NetworkSimulator(gym.Env):
 
         :return: the starting/initial observation of the environment
         """
-        self.time_step += 1
         self.ep_number += 1
         self.nsprs_seen_in_cur_ep = 0
 
@@ -425,12 +422,6 @@ class NetworkSimulator(gym.Env):
                 self.cur_nspr = None    # marked as None so a new one can be picked
                 # update the acceptance ratio
                 self.accepted_nsprs += 1
-                self.accepted_nsprs_by_step.append(self.time_step)
-                if self.ep_number in self.accepted_nsprs_by_ep:
-                    self.accepted_nsprs_by_ep[self.ep_number][0] += 1
-                    self.accepted_nsprs_by_ep[self.ep_number][1] = self.nsprs_seen_in_cur_ep
-                else:
-                    self.accepted_nsprs_by_ep[self.ep_number] = [1, self.nsprs_seen_in_cur_ep]
 
         # new observation
         obs = self._get_observation()
