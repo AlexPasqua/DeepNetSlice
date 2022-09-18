@@ -18,23 +18,23 @@
 
         <node id="0">
             <data key="d2">server</data>
-            <data key="d3">1000</data>
-            <data key="d4">5000</data>
+            <data key="d3">10000</data>
+            <data key="d4">50000</data>
         </node>
         <node id="1">
             <data key="d2">server</data>
-            <data key="d3">5000</data>
-            <data key="d4">1000</data>
+            <data key="d3">5</data>
+            <data key="d4">1</data>
         </node>
         <node id="2">
             <data key="d2">server</data>
-            <data key="d3">500</data>
-            <data key="d4">1000</data>
+            <data key="d3">5</data>
+            <data key="d4">1</data>
         </node>
         <node id="3">
             <data key="d2">server</data>
-            <data key="d3">2000</data>
-            <data key="d4">5000</data>
+            <data key="d3">2</data>
+            <data key="d4">5</data>
         </node>
         <!-- central router -->
         <node id="4">

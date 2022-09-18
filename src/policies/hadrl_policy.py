@@ -3,6 +3,7 @@ from typing import Callable, Dict, List, Optional, Type, Union, Tuple
 import gym
 import networkx as nx
 import torch as th
+from stable_baselines3.common.distributions import Distribution
 from stable_baselines3.common.policies import MultiInputActorCriticPolicy
 from stable_baselines3.common.preprocessing import preprocess_obs
 from torch import nn
@@ -114,6 +115,17 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         log_prob = distribution.log_prob(actions)
         values = self.value_net(latent_vf)
         return values, log_prob, distribution.entropy()
+
+    def get_distribution(self, obs: th.Tensor) -> Distribution:
+        """
+        Get the current policy distribution given the observations.
+
+        :param obs: Observation
+        :return: the action distribution.
+        """
+        policy_features, _ = self.extract_features(obs)
+        latent_pi = self.mlp_extractor.forward_actor(policy_features)
+        return self._get_action_dist_from_latent(latent_pi)
 
     def predict_values(self, obs: th.Tensor) -> th.Tensor:
         """

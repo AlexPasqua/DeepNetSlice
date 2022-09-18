@@ -22,15 +22,15 @@
         <data key="d4">20</data>
 
         <node id="0">
-            <data key="d5">1</data>
+            <data key="d5">100</data>
             <data key="d6">5</data>
         </node>
         <node id="1">
-            <data key="d5">5</data>
+            <data key="d5">500</data>
             <data key="d6">1</data>
         </node>
         <node id="2">
-            <data key="d5">5</data>
+            <data key="d5">50</data>
             <data key="d6">1</data>
         </node>
 

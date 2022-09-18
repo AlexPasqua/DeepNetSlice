@@ -1,9 +1,6 @@
 import math
 from typing import Union, Tuple
 
-import src.spaces
-from spaces.discrete_with_negatives import DiscreteWithNegatives
-
 import gym
 import networkx as nx
 import numpy as np

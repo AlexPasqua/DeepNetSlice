@@ -13,10 +13,11 @@ if __name__ == '__main__':
     # env = make_vec_env("CartPole-v1", n_envs=4)
 
     # model = A2C("MlpPolicy", env, verbose=1)
-    env = NetworkSimulator(psn_file='../PSNs/servers_box_with_central_router.graphml',
-                           nsprs_path='../NSPRs/',
-                           nsprs_per_episode=2,
-                           max_steps_per_episode=5)
+    env = NetworkSimulator(
+        psn_file='../PSNs/servers_box_with_central_router.graphml',
+        nsprs_path='../NSPRs/',
+        nsprs_per_episode=5,
+        max_steps_per_episode=100, )
 
     # env = make_vec_env(lambda: env, n_envs=1)
 
@@ -34,11 +35,11 @@ if __name__ == '__main__':
     #             device='cpu',
     #             )
 
-    model = A2C(policy=HADRLPolicy, env=env, verbose=2, device='cpu',
-                learning_rate=0.0001,
+    model = A2C(policy=HADRLPolicy, env=env, verbose=2, device='auto',
+                learning_rate=0.001,
                 n_steps=5,  # ogni quanti step fare un update
                 gamma=0.99,
-                ent_coef=0.5,
+                ent_coef=0.,
                 tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=env.psn,
@@ -51,8 +52,17 @@ if __name__ == '__main__':
 
     print(model.policy)
 
-    model.learn(total_timesteps=1000, log_interval=10,
-                callback=AcceptanceRatioCallback(verbose=1))
+    eval_env = NetworkSimulator(
+        psn_file='../PSNs/servers_box_with_central_router.graphml',
+        nsprs_path='../NSPRs/',
+        nsprs_per_episode=5,
+        max_steps_per_episode=100, )
+
+    model.learn(total_timesteps=100000, log_interval=100,
+                callback=AcceptanceRatioCallback(verbose=1),
+                eval_env=eval_env,
+                eval_freq=1000,
+                n_eval_episodes=4, )
     exit()
 
     # obs = env.reset()
@@ -62,4 +72,4 @@ if __name__ == '__main__':
     #     obs, rewards, done, info = env.step(action)
     #     if done:
     #         env.reset()
-        # env.render()
+    # env.render()
