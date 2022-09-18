@@ -32,6 +32,7 @@ class NetworkSimulator(gym.Env):
         """
         super(NetworkSimulator, self).__init__()
 
+        self._psn_file = psn_file
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path
         self.nsprs_per_episode = nsprs_per_episode
@@ -291,6 +292,12 @@ class NetworkSimulator(gym.Env):
 
         :return: the starting/initial observation of the environment
         """
+        # if last NSPR has not been placed completely, remove it, this is a new episode
+        self.cur_nspr = None
+
+        # reset network status (simply re-read the PSN file)
+        self.psn = reader.read_psn(graphml_file=self._psn_file)
+
         self.ep_number += 1
         self.nsprs_seen_in_cur_ep = 0
 

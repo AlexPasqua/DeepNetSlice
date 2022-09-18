@@ -51,11 +51,12 @@ class AcceptanceRatioCallback(BaseCallback):
 
         :return: (bool) If the callback returns False, training is aborted early.
         """
-        accepted = self.training_env.get_attr("accepted_nsprs", 0)[0]
         tot = self.training_env.get_attr("tot_nsprs", 0)[0]
-        acceptance_ratio = accepted / tot
-        self.logger.record("Acceptance ratio", acceptance_ratio)
-        return True
+        if tot > 0:
+            accepted = self.training_env.get_attr("accepted_nsprs", 0)[0]
+            acceptance_ratio = accepted / tot
+            self.logger.record("Acceptance ratio", acceptance_ratio)
+            return True
 
     def _on_rollout_end(self) -> None:
         """

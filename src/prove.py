@@ -16,7 +16,7 @@ if __name__ == '__main__':
     env = NetworkSimulator(psn_file='../PSNs/servers_box_with_central_router.graphml',
                            nsprs_path='../NSPRs/',
                            nsprs_per_episode=2,
-                           max_steps_per_episode=10)
+                           max_steps_per_episode=5)
 
     # env = make_vec_env(lambda: env, n_envs=1)
 
