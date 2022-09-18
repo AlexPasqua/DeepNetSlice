@@ -19,13 +19,13 @@ class NetworkSimulator(gym.Env):
     def __init__(self,
                  psn_file: str,
                  nsprs_path: str,
-                 max_nsprs_per_episode: int = None,
+                 nsprs_per_episode: int = None,
                  max_steps_per_episode: int = None):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
         :param nsprs_path: either directory with the GraphML files defining the
             NSPRs or path to a single GraphML file
-        :param max_nsprs_per_episode: max number of NSPRs to be evaluated
+        :param nsprs_per_episode: max number of NSPRs to be evaluated
             in each episode. If None, there is no limit.
         :param max_steps_per_episode: max number of steps in each episode.
             If None, there is no limit.
@@ -34,7 +34,7 @@ class NetworkSimulator(gym.Env):
 
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path
-        self.max_nsprs_per_episode = max_nsprs_per_episode
+        self.nsprs_per_episode = nsprs_per_episode
         self.nsprs_seen_in_cur_ep = 0
         self.max_steps_per_episode = max_steps_per_episode
         self.nsprs = None  # will be initialized in the reset method
@@ -179,7 +179,7 @@ class NetworkSimulator(gym.Env):
         self.reset_partial_rewards()
         self.cur_nspr = None
         self.pick_next_nspr()
-        obs = self._get_observation()
+        obs = self.get_observation()
         reward = self.rval_rejected_vnf
         return obs, reward
 
@@ -225,7 +225,7 @@ class NetworkSimulator(gym.Env):
         """
         return 1 if link['availBW'] >= self._cur_vl_reqBW else math.inf
 
-    def _get_observation(self) -> GymObs:
+    def get_observation(self) -> GymObs:
         """ Method used to get the observation of the environment.
 
         :return: an instance of an observation from the environment
@@ -295,12 +295,17 @@ class NetworkSimulator(gym.Env):
         self.nsprs_seen_in_cur_ep = 0
 
         # read the NSPRs to be evaluated
-        self.nsprs = reader.read_nsprs(nsprs_path=self.nsprs_path)
+        # self.nsprs = reader.read_nsprs(nsprs_path=self.nsprs_path)
+        max_duration = self.max_steps_per_episode if self.max_steps_per_episode is not None else 100
+        self.nsprs = reader.sample_nsprs(nsprs_path=self.nsprs_path,
+                                         n=self.nsprs_per_episode,
+                                         min_arrival_time=self.time_step,
+                                         max_duration=max_duration)
 
         # reset partial rewards to be accumulated across the episodes' steps
         self.reset_partial_rewards()
 
-        obs = self._get_observation()
+        obs = self.get_observation()
         return obs
 
     def step(self, action: int) -> Tuple[GymObs, float, bool, dict]:
@@ -323,10 +328,10 @@ class NetworkSimulator(gym.Env):
         self.check_for_departed_nsprs()
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
         picked_new_nspr = self.pick_next_nspr()
-        if picked_new_nspr and self.max_nsprs_per_episode is not None:
+        if picked_new_nspr and self.nsprs_per_episode is not None:
             self.tot_nsprs += 1
             self.nsprs_seen_in_cur_ep += 1
-            if self.nsprs_seen_in_cur_ep >= self.max_nsprs_per_episode:
+            if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
                 done = True
 
         # place the VNF and update the resources availabilities of the physical node
@@ -424,7 +429,7 @@ class NetworkSimulator(gym.Env):
                 self.accepted_nsprs += 1
 
         # new observation
-        obs = self._get_observation()
+        obs = self.get_observation()
 
         # increase time step
         self.time_step += 1

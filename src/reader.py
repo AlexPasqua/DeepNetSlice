@@ -1,4 +1,5 @@
 import os
+import random
 from typing import Tuple, List, Dict
 
 import networkx as nx
@@ -188,8 +189,33 @@ def read_nsprs(nsprs_path: str) -> Dict[int, List[nx.Graph]]:
     dir_path = nsprs_path
     for graphml_file in os.listdir(dir_path):
         nspr = read_single_nspr(os.path.join(dir_path, graphml_file))
-        if nspr.graph['ArrivalTime'] not in nspr_dict.keys():
-            nspr_dict[nspr.graph['ArrivalTime']] = [nspr]
-        else:
-            nspr_dict[nspr.graph['ArrivalTime']].append(nspr)
+        nspr_dict[nspr.graph['ArrivalTime']] = nspr_dict.get(nspr.graph['ArrivalTime'], []) + [nspr]
+    return nspr_dict
+
+
+def sample_nsprs(nsprs_path: str, n: int, min_arrival_time: int = 0,
+                 max_duration: int = 100) -> Dict[int, List[nx.Graph]]:
+    """ Samples a subset of NSPRs from a directory containing multiple NSPRs.
+    It assigns random arrival and departure time to those NSPRs.
+
+    :param nsprs_path: path to the directory containing the NSPRs
+    :param n: number of NSPRs to sample
+    :param min_arrival_time: minimum arrival time to assign to the sampled NSPRs
+    :param max_duration: maximum duration (dep. time - arr. time) to assign to the sampled NSPRs
+    :return: a dict having as keys the arrival times of the NSPRs and as
+        values the NSPRs themselves
+    :raise ValueError: if nsprs_path is not a directory
+    """
+    if not os.path.isdir(nsprs_path):
+        raise ValueError(f"{nsprs_path} is not a directory")
+
+    all_nsprs_files = os.listdir(nsprs_path)
+    sampled_nsprs_files = random.sample(all_nsprs_files, n)
+    arrival_times = random.sample(range(min_arrival_time, min_arrival_time + max_duration), n)
+    nspr_dict = {}
+    for i, arr_time in enumerate(arrival_times):
+        nspr = read_single_nspr(os.path.join(nsprs_path, sampled_nsprs_files[i]))
+        nspr.graph['ArrivalTime'] = arr_time
+        nspr.graph['DepartureTime'] = arr_time + random.randint(0, max_duration)
+        nspr_dict[arr_time] = nspr_dict.get(arr_time, []) + [nspr]
     return nspr_dict

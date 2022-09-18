@@ -15,7 +15,7 @@ if __name__ == '__main__':
     # model = A2C("MlpPolicy", env, verbose=1)
     env = NetworkSimulator(psn_file='../PSNs/servers_box_with_central_router.graphml',
                            nsprs_path='../NSPRs/',
-                           max_nsprs_per_episode=2,
+                           nsprs_per_episode=2,
                            max_steps_per_episode=10)
 
     # env = make_vec_env(lambda: env, n_envs=1)
