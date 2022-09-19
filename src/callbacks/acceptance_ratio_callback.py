@@ -8,8 +8,9 @@ class AcceptanceRatioCallback(BaseCallback):
 
     :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
     """
-    def __init__(self, verbose=0):
+    def __init__(self, name: str = "Acceptance ratio", verbose=0):
         super(AcceptanceRatioCallback, self).__init__(verbose)
+        self.name = name
         # Those variables will be accessible in the callback
         # (they are defined in the base class)
         # The RL model
@@ -28,20 +29,6 @@ class AcceptanceRatioCallback(BaseCallback):
         # # to have access to the parent object
         # self.parent = None  # type: Optional[BaseCallback]
 
-    def _on_training_start(self) -> None:
-        """
-        This method is called before the first rollout starts.
-        """
-        pass
-
-    def _on_rollout_start(self) -> None:
-        """
-        A rollout is the collection of environment interaction
-        using the current policy.
-        This event is triggered before collecting new samples.
-        """
-        pass
-
     def _on_step(self) -> bool:
         """
         This method will be called by the model after each call to `env.step()`.
@@ -55,17 +42,5 @@ class AcceptanceRatioCallback(BaseCallback):
         if tot > 0:
             accepted = self.training_env.get_attr("accepted_nsprs", 0)[0]
             acceptance_ratio = accepted / tot
-            self.logger.record("Acceptance ratio", acceptance_ratio)
+            self.logger.record(self.name, acceptance_ratio)
             return True
-
-    def _on_rollout_end(self) -> None:
-        """
-        This event is triggered before updating the policy.
-        """
-        pass
-
-    def _on_training_end(self) -> None:
-        """
-        This event is triggered before exiting the `learn()` method.
-        """
-        pass
