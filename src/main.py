@@ -19,7 +19,9 @@ if __name__ == '__main__':
         psn_file='../PSNs/servers_box_with_central_router.graphml',
         nsprs_path='../NSPRs/',
         nsprs_per_episode=5,
-        max_steps_per_episode=100, )
+        max_steps_per_episode=100,
+        reset_load_perc=0.5
+    )
 
     # env = make_vec_env(lambda: env, n_envs=1)
 
@@ -49,7 +51,9 @@ if __name__ == '__main__':
         psn_file='../PSNs/servers_box_with_central_router.graphml',
         nsprs_path='../NSPRs/',
         nsprs_per_episode=5,
-        max_steps_per_episode=100, )
+        max_steps_per_episode=100,
+        reset_load_perc=0.5
+    )
     eval_env = sb3.common.env_util.Monitor(eval_env)
 
     model.learn(total_timesteps=100000,

@@ -17,15 +17,16 @@ class NetworkSimulator(gym.Env):
                  psn_file: str,
                  nsprs_path: str,
                  nsprs_per_episode: int = None,
-                 max_steps_per_episode: int = None):
+                 max_steps_per_episode: int = None,
+                 reset_load_perc: Union[float, dict] = 0.):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
-        :param nsprs_path: either directory with the GraphML files defining the
-            NSPRs or path to a single GraphML file
-        :param nsprs_per_episode: max number of NSPRs to be evaluated
-            in each episode. If None, there is no limit.
-        :param max_steps_per_episode: max number of steps in each episode.
-            If None, there is no limit.
+        :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
+        :param nsprs_per_episode: max number of NSPRs to be evaluated in each episode. If None, there is no limit.
+        :param max_steps_per_episode: max number of steps in each episode. If None, there is no limit.
+        :param reset_load_perc: init percentage of load of the PSN's resources at each reset:
+            if float, that value applies to all the resources for all nodes and links;
+            if dict, it can specify the load for each type of resource.
         """
         super(NetworkSimulator, self).__init__()
 
@@ -35,6 +36,7 @@ class NetworkSimulator(gym.Env):
         self.nsprs_per_episode = nsprs_per_episode
         self.nsprs_seen_in_cur_ep = 0
         self.max_steps_per_episode = max_steps_per_episode
+        self.reset_load_perc = reset_load_perc
         self.nsprs = None  # will be initialized in the reset method
         self.waiting_nsprs = []  # list of NSPRs that arrived already and are waiting to be evaluated
         self.cur_nspr = None  # used to keep track of the current NSPR being evaluated
@@ -223,6 +225,21 @@ class NetworkSimulator(gym.Env):
         """
         return 1 if link['availBW'] >= self._cur_vl_reqBW else math.inf
 
+    def _init_psn_load(self, cpu_load_perc: float, ram_load_perc: float,
+                       bw_load_perc: float):
+        """ Initialize the PSN's load with the specified values
+
+        :param cpu_load_perc: the percentage of CPU load for each node
+        :param ram_load_perc: the percentage of RAM load for each node
+        :param bw_load_perc: the percentage of bandwidth load for each link
+        """
+        for _, node in self.psn.nodes.items():
+            if node['NodeType'] == "server":
+                node['availCPU'] = int(node['CPUcap'] * (1 - cpu_load_perc))
+                node['availRAM'] = int(node['RAMcap'] * (1 - ram_load_perc))
+        for _, link in self.psn.edges.items():
+            link['availBW'] = int(link['BWcap'] * (1 - bw_load_perc))
+
     def get_observation(self) -> GymObs:
         """ Method used to get the observation of the environment.
 
@@ -294,6 +311,15 @@ class NetworkSimulator(gym.Env):
 
         # reset network status (simply re-read the PSN file)
         self.psn = reader.read_psn(graphml_file=self._psn_file)
+
+        # initialize the PSN's load status
+        if isinstance(self.reset_load_perc, float):
+            cpu_load = ram_load = bw_load = self.reset_load_perc
+        else:
+            cpu_load = self.reset_load_perc.get('availCPU', 0)
+            ram_load = self.reset_load_perc.get('availRAM', 0)
+            bw_load = self.reset_load_perc.get('availBW', 0)
+        self._init_psn_load(cpu_load, ram_load, bw_load)
 
         self.ep_number += 1
         self.nsprs_seen_in_cur_ep = 0
