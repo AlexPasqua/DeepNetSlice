@@ -19,7 +19,7 @@ if __name__ == '__main__':
         psn_file='../PSNs/servers_box_with_central_router.graphml',
         nsprs_path='../NSPRs/',
         nsprs_per_episode=5,
-        max_steps_per_episode=100, )
+        max_steps_per_episode=8, )
 
     # env = make_vec_env(lambda: env, n_envs=1)
 
@@ -48,11 +48,11 @@ if __name__ == '__main__':
     eval_env = NetworkSimulator(
         psn_file='../PSNs/servers_box_with_central_router.graphml',
         nsprs_path='../NSPRs/',
-        nsprs_per_episode=5,
-        max_steps_per_episode=100, )
+        nsprs_per_episode=8,
+        max_steps_per_episode=10, )
     eval_env = sb3.common.env_util.Monitor(eval_env)
 
-    model.learn(total_timesteps=100000,
+    model.learn(total_timesteps=1000,
                 log_interval=100,
                 callback=[
                     AcceptanceRatioCallback(name="Acceptance ratio", verbose=2),
