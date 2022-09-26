@@ -13,17 +13,20 @@ GymObs = Union[Tuple, dict, np.ndarray, int]
 class NetworkSimulator(gym.Env):
     """ Class implementing the network simulator (RL environment) """
 
-    def __init__(self,
-                 psn_file: str,
-                 nsprs_path: str,
-                 nsprs_per_episode: int = None,
-                 max_steps_per_episode: int = None,
-                 reset_load_perc: Union[float, dict] = 0.):
+    def __init__(
+            self,
+            psn_file: str,
+            nsprs_path: str,
+            nsprs_per_episode: int = None,
+            nsprs_max_duration: int = 100,
+            reset_load_perc: Union[float, dict] = 0.
+
+    ):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
         :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
         :param nsprs_per_episode: max number of NSPRs to be evaluated in each episode. If None, there is no limit.
-        :param max_steps_per_episode: max number of steps in each episode. If None, there is no limit.
+        :param nsprs_max_duration: (optional) max duration of the NSPRs.
         :param reset_load_perc: init percentage of load of the PSN's resources at each reset:
             if float, that value applies to all the resources for all nodes and links;
             if dict, it can specify the load for each type of resource.
@@ -35,8 +38,9 @@ class NetworkSimulator(gym.Env):
         self.nsprs_path = nsprs_path
         self.nsprs_per_episode = nsprs_per_episode
         self.nsprs_seen_in_cur_ep = 0
-        self.max_steps_per_episode = max_steps_per_episode
         self.reset_load_perc = reset_load_perc
+        self.nsprs_max_duration = nsprs_max_duration
+        self.done = False
         self.nsprs = None  # will be initialized in the reset method
         self.waiting_nsprs = []  # list of NSPRs that arrived already and are waiting to be evaluated
         self.cur_nspr = None  # used to keep track of the current NSPR being evaluated
@@ -306,6 +310,8 @@ class NetworkSimulator(gym.Env):
 
         :return: the starting/initial observation of the environment
         """
+        self.done = False   # re-set 'done' attribute
+
         # if last NSPR has not been placed completely, remove it, this is a new episode
         self.cur_nspr = None
 
@@ -326,11 +332,10 @@ class NetworkSimulator(gym.Env):
 
         # read the NSPRs to be evaluated
         # self.nsprs = reader.read_nsprs(nsprs_path=self.nsprs_path)
-        max_duration = self.max_steps_per_episode if self.max_steps_per_episode is not None else 100
         self.nsprs = reader.sample_nsprs(nsprs_path=self.nsprs_path,
                                          n=self.nsprs_per_episode,
                                          min_arrival_time=self.time_step,
-                                         max_duration=max_duration)
+                                         max_duration=self.nsprs_max_duration)
 
         # reset partial rewards to be accumulated across the episodes' steps
         self.reset_partial_rewards()
@@ -347,7 +352,7 @@ class NetworkSimulator(gym.Env):
             server ID is done in the self._servers_map_idx_id dictionary
         :return: next observation, reward, done (True if the episode is over), info
         """
-        reward, done, info = 0, False, {}
+        reward, info = 0, {}
 
         # this happens only when the agent is prevented from choosing nodes that don't have enough resources,
         # i.e., when the environment is wrapped with PreventInfeasibleActions
@@ -362,7 +367,7 @@ class NetworkSimulator(gym.Env):
             self.tot_nsprs += 1
             self.nsprs_seen_in_cur_ep += 1
             if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
-                done = True
+                self.done = True
 
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
@@ -372,7 +377,7 @@ class NetworkSimulator(gym.Env):
             if not self.enough_avail_resources(physical_node=physical_node, vnf=self.cur_vnf):
                 # the VNF cannot be placed on the physical node
                 obs, reward = self.manage_unsuccessful_action()
-                return obs, reward, done, info
+                return obs, reward, self.done, info
 
             # update the resources availabilities of the physical node
             self.cur_vnf['placed'] = physical_node_id
@@ -425,7 +430,7 @@ class NetworkSimulator(gym.Env):
 
                         if exceeded_bw:
                             obs, reward = self.manage_unsuccessful_action()
-                            return obs, reward, done, info
+                            return obs, reward, self.done, info
 
                         # update the resource consumption reward
                         path_length = len(psn_path) - 1
@@ -463,11 +468,8 @@ class NetworkSimulator(gym.Env):
 
         # increase time step
         self.time_step += 1
-        if self.max_steps_per_episode is not None and \
-                self.time_step % self.max_steps_per_episode == 0:
-            done = True
 
-        return obs, reward, done, info
+        return obs, reward, self.done, info
 
     def render(self, mode="human"):
         raise NotImplementedError
