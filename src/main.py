@@ -23,7 +23,8 @@ if __name__ == '__main__':
         wrapper_class=ResetWithRandLoad,
         wrapper_kwargs=dict(
             min_perc=0.1,
-            max_perc=0.7
+            max_perc=0.7,
+            same_for_all=False,
         )
     )
 
@@ -59,7 +60,8 @@ if __name__ == '__main__':
         wrapper_class=ResetWithRandLoad,
         wrapper_kwargs=dict(
             min_perc=0.1,
-            max_perc=0.7
+            max_perc=0.7,
+            same_for_all=False,
         )
     )
 
