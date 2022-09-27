@@ -23,14 +23,14 @@ if __name__ == '__main__':
 
     vec_env = make_vec_env(
         env_id=TimeLimit,
-        n_envs=5,
+        n_envs=4,
         env_kwargs=dict(
             env=NetworkSimulator(
                 psn_file='../PSNs/servers_box_with_central_router.graphml',
                 nsprs_path='../NSPRs/',
                 nsprs_per_episode=5,
-                nsprs_max_duration=100),
-            max_episode_steps=3,
+                nsprs_max_duration=30),
+            max_episode_steps=30,
         )
     )
 
@@ -53,23 +53,32 @@ if __name__ == '__main__':
 
     print(model.policy)
 
-    eval_env = NetworkSimulator(
-        psn_file='../PSNs/servers_box_with_central_router.graphml',
-        nsprs_path='../NSPRs/',
-        nsprs_per_episode=8,
-        nsprs_max_duration=100,
-        reset_load_perc=0.5
-    )
-    eval_env = TimeLimit(eval_env, max_episode_steps=3)
-    eval_env = sb3.common.env_util.Monitor(eval_env)
-    eval_env = make_vec_env(lambda: eval_env, n_envs=5)
+    # eval_env = NetworkSimulator(
+    #     psn_file='../PSNs/servers_box_with_central_router.graphml',
+    #     nsprs_path='../NSPRs/',
+    #     nsprs_per_episode=5,
+    #     nsprs_max_duration=100,
+    #     reset_load_perc=0.5
+    # )
+    # eval_env = TimeLimit(eval_env, max_episode_steps=30)
+    # eval_env = sb3.common.env_util.Monitor(eval_env)
+    eval_env = make_vec_env(env_id=TimeLimit, n_envs=4,
+                            env_kwargs=dict(
+                                env=NetworkSimulator(
+                                    psn_file='../PSNs/servers_box_with_central_router.graphml',
+                                    nsprs_path='../NSPRs/',
+                                    nsprs_per_episode=5,
+                                    nsprs_max_duration=30,
+                                ),
+                                max_episode_steps=30
+                            ))
 
     model.learn(total_timesteps=100000,
                 log_interval=100,
                 callback=[
                     AcceptanceRatioCallback(name="Acceptance ratio", verbose=2),
                     EvalCallback(eval_env=eval_env, n_eval_episodes=4, warn=True,
-                                 eval_freq=1000, deterministic=True, verbose=2,
+                                 eval_freq=500, deterministic=True, verbose=2,
                                  callback_after_eval=AcceptanceRatioCallback(
                                      name="Eval acceptance ratio",
                                      verbose=2
