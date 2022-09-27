@@ -19,7 +19,6 @@ class NetworkSimulator(gym.Env):
             nsprs_path: str,
             nsprs_per_episode: int = None,
             nsprs_max_duration: int = 100,
-            reset_load_perc: Union[float, dict] = 0.
 
     ):
         """ Constructor
@@ -27,9 +26,6 @@ class NetworkSimulator(gym.Env):
         :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
         :param nsprs_per_episode: max number of NSPRs to be evaluated in each episode. If None, there is no limit.
         :param nsprs_max_duration: (optional) max duration of the NSPRs.
-        :param reset_load_perc: init percentage of load of the PSN's resources at each reset:
-            if float, that value applies to all the resources for all nodes and links;
-            if dict, it can specify the load for each type of resource.
         """
         super(NetworkSimulator, self).__init__()
 
@@ -38,7 +34,6 @@ class NetworkSimulator(gym.Env):
         self.nsprs_path = nsprs_path
         self.nsprs_per_episode = nsprs_per_episode
         self.nsprs_seen_in_cur_ep = 0
-        self.reset_load_perc = reset_load_perc
         self.nsprs_max_duration = nsprs_max_duration
         self.done = False
         self.nsprs = None  # will be initialized in the reset method

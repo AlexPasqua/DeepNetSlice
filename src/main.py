@@ -8,6 +8,7 @@ from callbacks import AcceptanceRatioCallback
 from environments.network_simulator import NetworkSimulator
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
+from wrappers import ResetWithLoad
 
 if __name__ == '__main__':
     base_tr_env = NetworkSimulator(
@@ -15,10 +16,11 @@ if __name__ == '__main__':
         nsprs_path='../NSPRs/',
         nsprs_per_episode=5,
         nsprs_max_duration=100,
-        reset_load_perc=0.5
     )
     tr_env = make_vec_env(env_id=gym.wrappers.TimeLimit, n_envs=4,
-                          env_kwargs=dict(env=base_tr_env, max_episode_steps=30))
+                          env_kwargs=dict(env=base_tr_env, max_episode_steps=30),
+                          wrapper_class=ResetWithLoad,
+                          wrapper_kwargs=dict(reset_load_perc=0.5))
 
     n_nodes = len(base_tr_env.psn.nodes)
 
@@ -48,7 +50,9 @@ if __name__ == '__main__':
     eval_env = make_vec_env(
         env_id=gym.wrappers.TimeLimit,
         n_envs=4,
-        env_kwargs=dict(env=base_eval_env, max_episode_steps=30)
+        env_kwargs=dict(env=base_eval_env, max_episode_steps=30),
+        wrapper_class=ResetWithLoad,
+        wrapper_kwargs=dict(reset_load_perc=0.5)
     )
 
     model.learn(total_timesteps=100000,
