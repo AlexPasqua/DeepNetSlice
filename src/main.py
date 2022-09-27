@@ -1,77 +1,59 @@
-import stable_baselines3 as sb3
-import torch
-from gym.wrappers import TimeLimit
+import gym
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 from torch import nn
 
 from callbacks import AcceptanceRatioCallback
 from environments.network_simulator import NetworkSimulator
-from policies.hadrl_policy import HADRLPolicy
 from policies.features_extractors import HADRLFeaturesExtractor
+from policies.hadrl_policy import HADRLPolicy
+from wrappers import ResetWithLoad
 
 if __name__ == '__main__':
-    env = NetworkSimulator(
+    base_tr_env = NetworkSimulator(
         psn_file='../PSNs/servers_box_with_central_router.graphml',
         nsprs_path='../NSPRs/',
         nsprs_per_episode=5,
         nsprs_max_duration=100,
-        reset_load_perc=0.5
     )
+    tr_env = make_vec_env(env_id=gym.wrappers.TimeLimit, n_envs=4,
+                          env_kwargs=dict(env=base_tr_env, max_episode_steps=30),
+                          wrapper_class=ResetWithLoad,
+                          wrapper_kwargs=dict(reset_load_perc=0.5))
 
-    vec_env = make_vec_env(
-        env_id=TimeLimit,
-        n_envs=4,
-        env_kwargs=dict(
-            env=NetworkSimulator(
-                psn_file='../PSNs/servers_box_with_central_router.graphml',
-                nsprs_path='../NSPRs/',
-                nsprs_per_episode=5,
-                nsprs_max_duration=30),
-            max_episode_steps=30,
-        )
-    )
+    n_nodes = len(base_tr_env.psn.nodes)
 
-    n_nodes = len(env.psn.nodes)
-
-    model = A2C(policy=HADRLPolicy, env=vec_env, verbose=2, device='auto',
+    model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
                 learning_rate=0.001,
                 n_steps=5,  # ogni quanti step fare un update
                 gamma=0.99,
                 ent_coef=0.01,
                 tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
-                    psn=env.psn,
+                    psn=base_tr_env.psn,
                     features_extractor_class=HADRLFeaturesExtractor,
                     features_extractor_kwargs=dict(
-                        psn=env.psn,
+                        psn=base_tr_env.psn,
                         activation_fn=nn.functional.relu
                     )
                 ))
 
     print(model.policy)
 
-    # eval_env = NetworkSimulator(
-    #     psn_file='../PSNs/servers_box_with_central_router.graphml',
-    #     nsprs_path='../NSPRs/',
-    #     nsprs_per_episode=5,
-    #     nsprs_max_duration=100,
-    #     reset_load_perc=0.5
-    # )
-    # eval_env = TimeLimit(eval_env, max_episode_steps=30)
-    # eval_env = sb3.common.env_util.Monitor(eval_env)
-    eval_env = make_vec_env(env_id=TimeLimit, n_envs=4,
-                            env_kwargs=dict(
-                                env=NetworkSimulator(
-                                    psn_file='../PSNs/servers_box_with_central_router.graphml',
-                                    nsprs_path='../NSPRs/',
-                                    nsprs_per_episode=5,
-                                    nsprs_max_duration=30,
-                                ),
-                                max_episode_steps=30
-                            ))
+    base_eval_env = NetworkSimulator(
+        psn_file='../PSNs/servers_box_with_central_router.graphml',
+        nsprs_path='../NSPRs/',
+        nsprs_per_episode=5,
+        nsprs_max_duration=30
+    )
+    eval_env = make_vec_env(
+        env_id=gym.wrappers.TimeLimit,
+        n_envs=4,
+        env_kwargs=dict(env=base_eval_env, max_episode_steps=30),
+        wrapper_class=ResetWithLoad,
+        wrapper_kwargs=dict(reset_load_perc=0.5)
+    )
 
     model.learn(total_timesteps=100000,
                 log_interval=100,
