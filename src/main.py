@@ -8,7 +8,7 @@ from callbacks import AcceptanceRatioCallback
 from environments.network_simulator import NetworkSimulator
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
-from wrappers import ResetWithLoad
+from wrappers import ResetWithRandLoad
 
 if __name__ == '__main__':
     base_tr_env = NetworkSimulator(
@@ -17,10 +17,15 @@ if __name__ == '__main__':
         nsprs_per_episode=5,
         nsprs_max_duration=100,
     )
-    tr_env = make_vec_env(env_id=gym.wrappers.TimeLimit, n_envs=4,
-                          env_kwargs=dict(env=base_tr_env, max_episode_steps=30),
-                          wrapper_class=ResetWithLoad,
-                          wrapper_kwargs=dict(reset_load_perc=0.5))
+    tr_env = make_vec_env(
+        env_id=gym.wrappers.TimeLimit, n_envs=4,
+        env_kwargs=dict(env=base_tr_env, max_episode_steps=30),
+        wrapper_class=ResetWithRandLoad,
+        wrapper_kwargs=dict(
+            min_perc=0.1,
+            max_perc=0.7
+        )
+    )
 
     n_nodes = len(base_tr_env.psn.nodes)
 
@@ -51,21 +56,26 @@ if __name__ == '__main__':
         env_id=gym.wrappers.TimeLimit,
         n_envs=4,
         env_kwargs=dict(env=base_eval_env, max_episode_steps=30),
-        wrapper_class=ResetWithLoad,
-        wrapper_kwargs=dict(reset_load_perc=0.5)
+        wrapper_class=ResetWithRandLoad,
+        wrapper_kwargs=dict(
+            min_perc=0.1,
+            max_perc=0.7
+        )
     )
+
+    list_of_callbacks = [
+        AcceptanceRatioCallback(name="Acceptance ratio", verbose=2),
+        EvalCallback(eval_env=eval_env, n_eval_episodes=4, warn=True,
+                     eval_freq=500, deterministic=True, verbose=2,
+                     callback_after_eval=AcceptanceRatioCallback(
+                         name="Eval acceptance ratio",
+                         verbose=2
+                     ))
+    ]
 
     model.learn(total_timesteps=100000,
                 log_interval=100,
-                callback=[
-                    AcceptanceRatioCallback(name="Acceptance ratio", verbose=2),
-                    EvalCallback(eval_env=eval_env, n_eval_episodes=4, warn=True,
-                                 eval_freq=500, deterministic=True, verbose=2,
-                                 callback_after_eval=AcceptanceRatioCallback(
-                                     name="Eval acceptance ratio",
-                                     verbose=2
-                                 ))
-                ],)
+                callback=list_of_callbacks)
 
     # obs = env.reset()
     # while True:
