@@ -38,9 +38,15 @@ class AcceptanceRatioCallback(BaseCallback):
 
         :return: (bool) If the callback returns False, training is aborted early.
         """
-        tot = self.training_env.get_attr("tot_nsprs", 0)[0]
-        if tot > 0:
-            accepted = self.training_env.get_attr("accepted_nsprs", 0)[0]
-            acceptance_ratio = accepted / tot
-            self.logger.record(self.name, acceptance_ratio)
-            return True
+        list_of_totals = self.training_env.get_attr("tot_nsprs")
+        list_of_accepted = self.training_env.get_attr("accepted_nsprs")
+        local_accept_ratios = []
+        for i, tot in enumerate(list_of_totals):
+            if tot > 0:
+                cur_accept_ratio = list_of_accepted[i] / tot
+                local_accept_ratios.append(cur_accept_ratio)
+        n_ratios = len(local_accept_ratios)
+        if n_ratios > 0:
+            overall_accept_ratio = sum(local_accept_ratios) / n_ratios
+            self.logger.record(self.name, overall_accept_ratio)
+        return True
