@@ -8,7 +8,21 @@ from callbacks import AcceptanceRatioCallback
 from environments.network_simulator import NetworkSimulator
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
-from wrappers import ResetWithRandLoad
+from wrappers import ResetWithRandLoad, HadrlDataGenerator
+
+
+def make_env():
+    env = NetworkSimulator(
+        psn_file='../PSNs/servers_box_with_central_router.graphml',
+        nsprs_path='../NSPRs/',
+        nsprs_per_episode=5,
+        nsprs_max_duration=100,
+    )
+    env = gym.wrappers.TimeLimit(env, max_episode_steps=30)
+    env = ResetWithRandLoad(env, min_perc=0.1, max_perc=0.7, same_for_all=False)
+    env = HadrlDataGenerator(env, path='../PSNs/hadrl_psn.graphml')
+    return env
+
 
 if __name__ == '__main__':
     base_tr_env = NetworkSimulator(
@@ -17,16 +31,18 @@ if __name__ == '__main__':
         nsprs_per_episode=5,
         nsprs_max_duration=100,
     )
-    tr_env = make_vec_env(
-        env_id=gym.wrappers.TimeLimit, n_envs=4,
-        env_kwargs=dict(env=base_tr_env, max_episode_steps=30),
-        wrapper_class=ResetWithRandLoad,
-        wrapper_kwargs=dict(
-            min_perc=0.1,
-            max_perc=0.7,
-            same_for_all=False,
-        )
-    )
+    # tr_env = make_vec_env(
+    #     env_id=gym.wrappers.TimeLimit, n_envs=4,
+    #     env_kwargs=dict(env=base_tr_env, max_episode_steps=30),
+    #     wrapper_class=ResetWithRandLoad,
+    #     wrapper_kwargs=dict(
+    #         min_perc=0.1,
+    #         max_perc=0.7,
+    #         same_for_all=False,
+    #     )
+    # )
+
+    tr_env = make_vec_env(env_id=make_env, n_envs=4)
 
     n_nodes = len(base_tr_env.psn.nodes)
 
