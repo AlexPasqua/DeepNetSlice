@@ -83,12 +83,12 @@ if __name__ == '__main__':
 
     list_of_callbacks = [
         AcceptanceRatioCallback(name="Acceptance ratio", verbose=2),
-        EvalCallback(eval_env=eval_env, n_eval_episodes=4, warn=True,
-                     eval_freq=500, deterministic=True, verbose=2,
-                     callback_after_eval=AcceptanceRatioCallback(
-                         name="Eval acceptance ratio",
-                         verbose=2
-                     ))
+        # EvalCallback(eval_env=eval_env, n_eval_episodes=4, warn=True,
+        #              eval_freq=500, deterministic=True, verbose=2,
+        #              callback_after_eval=AcceptanceRatioCallback(
+        #                  name="Eval acceptance ratio",
+        #                  verbose=2
+        #              ))
     ]
 
     model.learn(total_timesteps=100000,
