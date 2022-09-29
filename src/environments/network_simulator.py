@@ -48,13 +48,9 @@ class NetworkSimulator(gym.Env):
         self.accepted_nsprs = 0  # for the overall acceptance ratio
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
-        nodes_ids = list(self.psn.nodes.keys())
-        self._map_id_idx = {nodes_ids[idx]: idx for idx in range(len(nodes_ids))}
-
+        self._map_id_idx = None
         # map (dict) between an index of a list (incrementing int) and the ID of a server
-        servers_ids = [node_id for node_id, node in self.psn.nodes.items()
-                       if node['NodeType'] == 'server']
-        self._servers_map_idx_id = {idx: servers_ids[idx] for idx in range(len(servers_ids))}
+        self._servers_map_idx_id = None
 
         # partial rewards to be accumulated across the steps of evaluation of a single NSPR
         self._acceptance_rewards = []
@@ -70,6 +66,8 @@ class NetworkSimulator(gym.Env):
         ONE_BILLION = 1000000000  # constant for readability
         n_nodes = len(self.psn.nodes)
         # action space = number of servers
+        servers_ids = [node_id for node_id, node in self.psn.nodes.items()
+                       if node['NodeType'] == 'server']
         self.action_space = gym.spaces.Discrete(len(servers_ids))
         self.observation_space = gym.spaces.Dict({
             # PSN STATE
@@ -297,6 +295,17 @@ class NetworkSimulator(gym.Env):
 
         # reset network status (simply re-read the PSN file)
         self.psn = reader.read_psn(graphml_file=self._psn_file)
+
+        # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
+        if self._map_id_idx is None:
+            nodes_ids = list(self.psn.nodes.keys())
+            self._map_id_idx = {nodes_ids[idx]: idx for idx in range(len(nodes_ids))}
+        # map (dict) between an index of a list (incrementing int) and the ID of a server
+        if self._servers_map_idx_id is None:
+            servers_ids = [node_id for node_id, node in self.psn.nodes.items()
+                           if node['NodeType'] == 'server']
+            self._servers_map_idx_id = {idx: servers_ids[idx] for idx in
+                                        range(len(servers_ids))}
 
         self.ep_number += 1
         self.nsprs_seen_in_cur_ep = 0

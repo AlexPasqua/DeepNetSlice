@@ -26,8 +26,8 @@ class HadrlDataGenerator(gym.Wrapper):
             ram_cap: int = 300,
             intra_CCP_bw_cap: int = 100000,  # 100000 Mbps = 100 Gbps
             intra_CDC_bw_cap: int = 100000,  # 100000 Mbps = 100 Gbps
-            intra_EDC_bw_cap: int = 10000,   # 10000 Mbps = 10 Gbps
-            outer_DC_bw_cap: int = 100000,   # 100000 Mbps = 100 Gbps
+            intra_EDC_bw_cap: int = 10000,  # 10000 Mbps = 10 Gbps
+            outer_DC_bw_cap: int = 100000,  # 100000 Mbps = 100 Gbps
     ):
         super().__init__(env)
         self._path = path
@@ -94,7 +94,8 @@ class HadrlDataGenerator(gym.Wrapper):
         self._create_HADRL_links(
             g, n_CCPs, n_CDCs, n_EDCs, n_servers_per_CCP, n_servers_per_CDC,
             n_servers_per_EDC, CCP_ids, CDC_ids, EDC_ids, routers_ids,
-            intra_CCP_bw_cap, intra_CDC_bw_cap, intra_EDC_bw_cap, outer_DC_bw_cap)
+            intra_CCP_bw_cap, intra_CDC_bw_cap, intra_EDC_bw_cap,
+            outer_DC_bw_cap)
 
         # save graph
         nx.write_graphml(g, path)
@@ -143,34 +144,41 @@ class HadrlDataGenerator(gym.Wrapper):
         # CCPs' servers to their routers
         for i in range(n_CCPs):
             for j in range(n_servers_per_CCP):
-                g.add_edge(CCP_ids[i, j], CCPs_routers[i], BWcap=intra_CCP_bw_cap)
+                g.add_edge(CCP_ids[i, j], CCPs_routers[i],
+                           BWcap=intra_CCP_bw_cap)
 
         # CDCs' servers to their routers
         for i in range(n_CDCs):
             for j in range(n_servers_per_CDC):
-                g.add_edge(CDC_ids[i, j], CDCs_routers[i], BWcap=intra_CDC_bw_cap)
+                g.add_edge(CDC_ids[i, j], CDCs_routers[i],
+                           BWcap=intra_CDC_bw_cap)
 
         # EDCs' servers to their routers
         for i in range(n_EDCs):
             for j in range(n_servers_per_EDC):
-                g.add_edge(EDC_ids[i, j], EDCs_routers[i], BWcap=intra_EDC_bw_cap)
+                g.add_edge(EDC_ids[i, j], EDCs_routers[i],
+                           BWcap=intra_EDC_bw_cap)
 
         # CDCs' routers to CPPs' routers
         for i in range(n_CDCs):
             # each CDC is connected to one CCP
             corresp_CCP = np.random.randint(0, n_CCPs)
-            g.add_edge(CDCs_routers[i], CCPs_routers[corresp_CCP], BWcap=outer_DC_bw_cap)
+            g.add_edge(CDCs_routers[i], CCPs_routers[corresp_CCP],
+                       BWcap=outer_DC_bw_cap)
 
         # connect each CDC's router to n EDCs' routers
         n_EDCs_per_CDC = 3
         for i in range(n_CDCs):
-            corresp_EDCs = np.random.choice(n_EDCs, n_EDCs_per_CDC, replace=False)
+            corresp_EDCs = np.random.choice(n_EDCs, n_EDCs_per_CDC,
+                                            replace=False)
             for j in range(n_EDCs_per_CDC):
-                g.add_edge(CDCs_routers[i], EDCs_routers[corresp_EDCs[j]], BWcap=outer_DC_bw_cap)
+                g.add_edge(CDCs_routers[i], EDCs_routers[corresp_EDCs[j]],
+                           BWcap=outer_DC_bw_cap)
 
         # connect CDCs and EDCs' routers in a circular way (like in Fig. 1 in HA-DRL paper)
         CDCs_and_EDCs_routers = np.concatenate((CDCs_routers, EDCs_routers))
         for i in range(len(CDCs_and_EDCs_routers)):
             g.add_edge(CDCs_and_EDCs_routers[i],
-                       CDCs_and_EDCs_routers[(i + 1) % len(CDCs_and_EDCs_routers)],
+                       CDCs_and_EDCs_routers[
+                           (i + 1) % len(CDCs_and_EDCs_routers)],
                        BWcap=outer_DC_bw_cap)
