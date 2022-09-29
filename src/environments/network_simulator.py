@@ -28,9 +28,8 @@ class NetworkSimulator(gym.Env):
         :param nsprs_max_duration: (optional) max duration of the NSPRs.
         """
         super(NetworkSimulator, self).__init__()
-
         self._psn_file = psn_file
-        self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
+        self.psn = reader.read_psn(graphml_file=self._psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path
         self.nsprs_per_episode = nsprs_per_episode
         self.nsprs_seen_in_cur_ep = 0
@@ -86,6 +85,10 @@ class NetworkSimulator(gym.Env):
             'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
             'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
         })
+
+    def _init_action_space(self):
+        """ Initializes the action space """
+        raise NotImplementedError
 
     @property
     def cur_vnf(self):

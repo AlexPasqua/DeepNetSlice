@@ -29,12 +29,21 @@ class HadrlDataGenerator(gym.Wrapper):
             intra_EDC_bw_cap: int = 10000,  # 10000 Mbps = 10 Gbps
             outer_DC_bw_cap: int = 100000,  # 100000 Mbps = 100 Gbps
     ):
+        self.unwrapped._psn_file = path
         super().__init__(env)
         self._path = path
         self._create_HADRL_PSN_file(path, n_CCPs, n_CDCs, n_EDCs,
                                     n_servers_per_DC, cpu_cap, ram_cap,
                                     intra_CCP_bw_cap, intra_CDC_bw_cap,
                                     intra_EDC_bw_cap, outer_DC_bw_cap)
+
+        # re-define action space
+        servers_ids = [node_id for node_id, node in self.psn.nodes.items()
+                       if node['NodeType'] == 'server']
+        self.unwrapped.action_space = gym.spaces.Discrete(len(servers_ids))
+
+        # re-define observation space
+
 
     def reset(self, **kwargs):
         # make the env read the PSN file created by this wrapper
