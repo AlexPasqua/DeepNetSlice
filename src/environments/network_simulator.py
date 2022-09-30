@@ -16,7 +16,7 @@ class NetworkSimulator(gym.Env):
     def __init__(
             self,
             psn_file: str,
-            nsprs_path: str,
+            nsprs_path: str = "../NSPRs/",
             nsprs_per_episode: int = None,
             nsprs_max_duration: int = 100,
 
