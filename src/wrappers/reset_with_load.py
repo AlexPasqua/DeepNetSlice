@@ -13,8 +13,9 @@ class ResetWithLoad(gym.Wrapper, ABC):
         self.cpu_load = self.ram_load = self.bw_load = 0.
 
     def reset(self, **kwargs):
-        obs = self.env.reset(**kwargs)
+        self.env.reset(**kwargs)
         self._init_psn_load()
+        obs = self.env.get_observation()    # the obs in the env.reset method is outdated
         return obs
 
     def _init_psn_load(self):

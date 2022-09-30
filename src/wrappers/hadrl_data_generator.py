@@ -44,10 +44,9 @@ class HadrlDataGenerator(gym.Wrapper):
 
         # re-define observation space
 
-
     def reset(self, **kwargs):
         # make the env read the PSN file created by this wrapper
-        self.unwrapped._psn_file = self._path
+        self.env._psn_file = self._path
         return self.env.reset(**kwargs)
 
     def _create_HADRL_PSN_file(
