@@ -9,7 +9,7 @@ from environments.network_simulator import NetworkSimulator
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
 from utils import create_HADRL_PSN_file
-from wrappers import ResetWithRandLoad, HadrlDataGenerator
+from wrappers import ResetWithRandLoad, NSPRsGeneratorHADRL
 
 
 psn_path = '../PSNs/hadrl_psn.graphml'
@@ -24,7 +24,7 @@ def make_env():
     )
     env = gym.wrappers.TimeLimit(env, max_episode_steps=30)
     # env = ResetWithRandLoad(env, min_perc=0.1, max_perc=0.7, same_for_all=False)
-    env = HadrlDataGenerator(env, path='../PSNs/hadrl_psn.graphml')
+    env = NSPRsGeneratorHADRL(env)
     return env
 
 

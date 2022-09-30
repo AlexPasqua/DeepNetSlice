@@ -210,7 +210,7 @@ def sample_nsprs(nsprs_path: str, n: int, min_arrival_time: int = 0,
         raise ValueError(f"{nsprs_path} is not a directory")
 
     all_nsprs_files = os.listdir(nsprs_path)
-    n = min(n, len(all_nsprs_files))
+    n = min(n, len(all_nsprs_files)) if n is not None else len(all_nsprs_files)
     sampled_nsprs_files = random.sample(all_nsprs_files, n)
     arrival_times = random.sample(range(min_arrival_time, min_arrival_time + max_duration), n)
     nspr_dict = {}
