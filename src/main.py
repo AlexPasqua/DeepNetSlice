@@ -23,8 +23,8 @@ def make_env():
         nsprs_max_duration=30,
     )
     env = gym.wrappers.TimeLimit(env, max_episode_steps=30)
-    env = ResetWithRandLoad(env, min_perc=0.1, max_perc=0.7, same_for_all=False)
-    # env = HadrlDataGenerator(env, path='../PSNs/hadrl_psn.graphml')
+    # env = ResetWithRandLoad(env, min_perc=0.1, max_perc=0.7, same_for_all=False)
+    env = HadrlDataGenerator(env, path='../PSNs/hadrl_psn.graphml')
     return env
 
 
@@ -55,7 +55,7 @@ if __name__ == '__main__':
                 n_steps=10,  # ogni quanti step fare un update
                 gamma=0.99,
                 ent_coef=0.01,
-                tensorboard_log="../tb_logs/",
+                # tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=base_tr_env.psn,
                     features_extractor_class=HADRLFeaturesExtractor,

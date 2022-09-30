@@ -29,8 +29,8 @@ class HadrlDataGenerator(gym.Wrapper):
             intra_EDC_bw_cap: int = 10000,  # 10000 Mbps = 10 Gbps
             outer_DC_bw_cap: int = 100000,  # 100000 Mbps = 100 Gbps
     ):
-        self.unwrapped._psn_file = path
         super().__init__(env)
+        self.env._psn_file = path
         self._path = path
         self._create_HADRL_PSN_file(path, n_CCPs, n_CDCs, n_EDCs,
                                     n_servers_per_DC, cpu_cap, ram_cap,
