@@ -136,13 +136,14 @@ class NetworkSimulator(gym.Env):
 
     def pick_next_nspr(self):
         """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
-        nspr_is_new = False
         if self.cur_nspr is None and self.waiting_nsprs:
             self.cur_nspr = self.waiting_nsprs.pop(0)
             self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
             self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
-            nspr_is_new = True
-        return nspr_is_new
+            self.tot_nsprs += 1
+            self.nsprs_seen_in_cur_ep += 1
+            if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
+                self.done = True
 
     def check_for_departed_nsprs(self):
         """ Checks it some NSPRs have reached their departure time and in case
@@ -333,12 +334,7 @@ class NetworkSimulator(gym.Env):
 
         self.check_for_departed_nsprs()
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
-        picked_new_nspr = self.pick_next_nspr()
-        if picked_new_nspr and self.nsprs_per_episode is not None:
-            self.tot_nsprs += 1
-            self.nsprs_seen_in_cur_ep += 1
-            if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
-                self.done = True
+        self.pick_next_nspr()
 
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
