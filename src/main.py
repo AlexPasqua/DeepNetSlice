@@ -80,7 +80,7 @@ if __name__ == '__main__':
         env_kwargs=dict(time_limit=False,
                         reset_with_rand_load=False,
                         hadrl_nsprs=True,
-                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=200)),
+                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=200, load=0.5)),
     )
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
@@ -123,7 +123,7 @@ if __name__ == '__main__':
         env_kwargs=dict(time_limit=False,
                         reset_with_rand_load=False,
                         hadrl_nsprs=True,
-                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=10)),
+                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=2)),
     )
 
     list_of_callbacks = [

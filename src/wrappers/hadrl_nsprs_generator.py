@@ -40,9 +40,11 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
         self.load = load
         self.tot_cpu_cap = self._get_tot_cpu_cap()
         self.nspr_model = self._get_nspr_model()
+        self.max_steps = None
         try:
             # if env is wrapped in TimeLimit, max arrival time of NSPRs is max episode length
-            self.nsprs_duration = min(self.env._max_episode_steps, 100)
+            self.max_steps = self.env._max_episode_steps
+            self.nsprs_duration = min(self.max_steps, 100)
         except AttributeError:
             self.nsprs_duration = 100
         # computed according to Sec. VII.C of HA-DRL paper
@@ -58,27 +60,77 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
         nspr_model.add_node(0, reqCPU=self.cpu_req_per_vnf,
                             reqRAM=self.ram_req_per_vnf, placed=-1)
         for i in range(1, self.vnfs_per_nspr):
-            nspr_model.add_edge(i-1, i, reqBW=self.bw_req_per_vl, placed=[])
+            nspr_model.add_edge(i - 1, i, reqBW=self.bw_req_per_vl, placed=[])
             nspr_model.add_node(i, reqCPU=self.cpu_req_per_vnf,
                                 reqRAM=self.ram_req_per_vnf, placed=-1)
         return nspr_model
 
     def _generate_nsprs(self):
-        poisson_samples = np.random.poisson(lam=self.arr_rate, size=self.nsprs_per_ep)
+        if self.arr_rate >= 0.3:
+            nsprs_dict = self._generate_nsprs_poisson()
+        else:
+            nsprs_dict = self._generate_nsprs_deterministic()
+        return nsprs_dict
+
+    def _generate_nsprs_poisson(self):
+        cur_arr_time = self.env.time_step
+        created_nsprs = 0
         nsprs_dict = {}
-        cur_arr_time = n_created_nsprs = 0
-        for sample in poisson_samples:
-            if sample > 0:
+        while True:
+            # NOTE: if self.max_steps is None, and the poisson sampling keeps
+            # generating 0, this will loop forever, but since this is executed
+            # only for a sufficiently high arrival rate, this is extremely unlikely to happen
+            poisson_sample = np.random.poisson(lam=self.arr_rate)
+            if poisson_sample > 0:
                 cur_nspr = copy.deepcopy(self.nspr_model)
                 cur_nspr.graph['ArrivalTime'] = cur_arr_time
-                cur_nspr.graph['DepartureTime'] = cur_arr_time + self.nsprs_duration
-                n_nsprs_to_create = min(sample, self.nsprs_per_ep - n_created_nsprs)
-                if n_nsprs_to_create <= 0:
+                cur_nspr.graph[
+                    'DepartureTime'] = cur_arr_time + self.nsprs_duration
+                nsprs_to_create = min(poisson_sample,
+                                      self.nsprs_per_ep - created_nsprs)
+                if nsprs_to_create <= 0:
                     break
-                nsprs_dict[cur_arr_time] = [copy.deepcopy(cur_nspr) for _ in range(n_nsprs_to_create)]
-                n_created_nsprs += n_nsprs_to_create
-                cur_arr_time += 1
+                nsprs_dict[cur_arr_time] = [copy.deepcopy(cur_nspr) for _ in
+                                            range(nsprs_to_create)]
+                created_nsprs += nsprs_to_create
+            cur_arr_time += 1
+            if self.max_steps is not None and self.env.time_step + cur_arr_time > self.max_steps:
+                break
         return nsprs_dict
+
+    def _generate_nsprs_deterministic(self):
+        if self.arr_rate >= 1:
+            raise NotImplementedError
+            # this function is called only for low arrival rates
+        else:
+            one_every_how_many_steps = 1 / self.arr_rate
+            decimal_part = round(one_every_how_many_steps - int(one_every_how_many_steps), 2)
+            one_every_how_many_steps = int(one_every_how_many_steps)
+            correction_every_how_many_steps = round(1 / decimal_part)
+            nsprs_dict = {}
+            step = self.env.time_step
+            steps_without_correction = 0
+            created_nsprs = 0
+            while True:
+                if step % one_every_how_many_steps == 0 or \
+                        steps_without_correction == correction_every_how_many_steps:
+                    cur_nspr = copy.deepcopy(self.nspr_model)
+                    cur_nspr.graph['ArrivalTime'] = step
+                    cur_nspr.graph['DepartureTime'] = step + self.nsprs_duration
+                    nsprs_dict[step] = [cur_nspr]
+                    created_nsprs += 1
+                    if step % one_every_how_many_steps == 0 and \
+                            steps_without_correction == correction_every_how_many_steps:
+                        nsprs_dict[step].append(copy.deepcopy(cur_nspr))
+                        created_nsprs += 1
+                    if steps_without_correction == correction_every_how_many_steps:
+                        steps_without_correction = 0
+                step += 1
+                steps_without_correction += 1
+                if created_nsprs >= self.nsprs_per_ep or \
+                        (self.max_steps is not None and step > self.max_steps):
+                    break
+            return nsprs_dict
 
     def _get_tot_cpu_cap(self):
         tot_cpu_cap = 0
