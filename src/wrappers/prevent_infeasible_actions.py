@@ -1,7 +1,7 @@
 import gym
 from gym.spaces import Discrete
 
-import src.spaces
+import spaces
 from spaces import DiscreteWithNegatives
 
 

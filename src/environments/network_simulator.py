@@ -192,7 +192,7 @@ class NetworkSimulator(gym.Env):
         #   the number of VNF in the NSPR times
         #   the maximum acceptance reward value (i.e. every VNF is accepted) times
         #   the maximum resource consumption reward value (i.e. 1) times
-        #   the maximum load balancing reward value (i.e. 1+1=2)
+        #   the maximum tr_load balancing reward value (i.e. 1+1=2)
         max_reward = len(self.cur_nspr.nodes) * self.rval_accepted_vnf * 1 * 2
         return reward / max_reward * 10
 
@@ -254,8 +254,8 @@ class NetworkSimulator(gym.Env):
                     max_cpu = node['CPUcap']
                 if node['RAMcap'] > max_ram:
                     max_ram = node['RAMcap']
-                if tot_bw > max_bw:
-                    max_bw = tot_bw
+            if tot_bw > max_bw:
+                max_bw = tot_bw
 
         # normalize the quantities
         cpu_availabilities = cpu_availabilities / max_cpu
@@ -350,7 +350,7 @@ class NetworkSimulator(gym.Env):
             self.cur_vnf['placed'] = physical_node_id
             physical_node['availCPU'] -= self.cur_vnf['reqCPU']
             physical_node['availRAM'] -= self.cur_vnf['reqRAM']
-            # update acceptance reward and load balancing reward
+            # update acceptance reward and tr_load balancing reward
             self._acceptance_rewards.append(self.rval_accepted_vnf)
             self._load_balancing_rewards.append(
                 physical_node['availCPU'] / physical_node['CPUcap'] +

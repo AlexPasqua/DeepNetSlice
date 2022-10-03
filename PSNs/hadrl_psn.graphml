@@ -1,7 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
-  <key id="d5" for="edge" attr.name="BWcap" attr.type="long" />
-  <key id="d4" for="edge" attr.name="bw" attr.type="long" />
+  <key id="d4" for="edge" attr.name="BWcap" attr.type="long" />
   <key id="d3" for="node" attr.name="RAMcap" attr.type="long" />
   <key id="d2" for="node" attr.name="CPUcap" attr.type="long" />
   <key id="d1" for="node" attr.name="NodeType" attr.type="string" />
@@ -183,49 +182,49 @@
       <data key="d4">100000</data>
     </edge>
     <edge source="23" target="24">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="23" target="25">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="24" target="18">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
-    <edge source="24" target="27">
-      <data key="d5">100000</data>
+    <edge source="24" target="26">
+      <data key="d4">100000</data>
     </edge>
     <edge source="24" target="28">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="24" target="25">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="25" target="19">
-      <data key="d5">100000</data>
-    </edge>
-    <edge source="25" target="27">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="25" target="28">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
+    </edge>
+    <edge source="25" target="27">
+      <data key="d4">100000</data>
     </edge>
     <edge source="25" target="26">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="26" target="20">
-      <data key="d5">10000</data>
+      <data key="d4">10000</data>
     </edge>
     <edge source="26" target="27">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="27" target="21">
-      <data key="d5">10000</data>
+      <data key="d4">10000</data>
     </edge>
     <edge source="27" target="28">
-      <data key="d5">100000</data>
+      <data key="d4">100000</data>
     </edge>
     <edge source="28" target="22">
-      <data key="d5">10000</data>
+      <data key="d4">10000</data>
     </edge>
     <data key="d0">HA-DRL PSN</data>
   </graph>

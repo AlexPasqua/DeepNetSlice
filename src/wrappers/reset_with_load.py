@@ -6,7 +6,7 @@ import numpy as np
 
 
 class ResetWithLoad(gym.Wrapper, ABC):
-    """ Abstract class. Wrapper to reset the PSN with a certain load """
+    """ Abstract class. Wrapper to reset the PSN with a certain tr_load """
 
     def __init__(self, env: gym.Env):
         super().__init__(env)
@@ -19,7 +19,7 @@ class ResetWithLoad(gym.Wrapper, ABC):
         return obs
 
     def _init_psn_load(self):
-        """ Initialize the PSN's load with the specified values """
+        """ Initialize the PSN's tr_load with the specified values """
         for _, node in self.env.psn.nodes.items():
             if node['NodeType'] == "server":
                 node['availCPU'] = int(node['CPUcap'] * (1 - self.cpu_load))
@@ -29,19 +29,19 @@ class ResetWithLoad(gym.Wrapper, ABC):
 
 
 class ResetWithFixedLoad(ResetWithLoad):
-    """ Reset the PSN with a certain - fixed - amount of load """
+    """ Reset the PSN with a certain - fixed - amount of tr_load """
 
     def __init__(self, env: gym.Env, reset_load_perc: Union[float, dict] = 0.):
         """ Constructor
 
         :param env: :param env: the environment to wrap
-        :param reset_load_perc: init percentage of load of the PSN's resources at each reset:
+        :param reset_load_perc: init percentage of tr_load of the PSN's resources at each reset:
             if float, that value applies to all the resources for all nodes and links;
-            if dict, it can specify the load for each type of resource.
+            if dict, it can specify the tr_load for each type of resource.
         """
         super().__init__(env)
         assert isinstance(reset_load_perc, (float, dict))
-        # define the load percentages of each resource
+        # define the tr_load percentages of each resource
         if isinstance(reset_load_perc, float):
             assert 0 <= reset_load_perc <= 1
             self.cpu_load = self.ram_load = self.bw_load = reset_load_perc
@@ -53,15 +53,15 @@ class ResetWithFixedLoad(ResetWithLoad):
 
 
 class ResetWithRandLoad(ResetWithLoad):
-    """ Reset the PSN with a random uniform amount of load """
+    """ Reset the PSN with a random uniform amount of tr_load """
 
     def __init__(self, env: gym.Env, min_perc: Union[float, dict],
                  max_perc: Union[float, dict], same_for_all: bool = True):
         """ Constructor
 
         :param env: the environment to wrap
-        :param min_perc: minimum percentage of load of the PSN's resources at each reset
-        :param max_perc: maximum percentage of load of the PSN's resources at each reset
+        :param min_perc: minimum percentage of tr_load of the PSN's resources at each reset
+        :param max_perc: maximum percentage of tr_load of the PSN's resources at each reset
         :param same_for_all: if True, the same random value is used for all the nodes / links
         """
         super().__init__(env)
@@ -71,7 +71,7 @@ class ResetWithRandLoad(ResetWithLoad):
         assert (isinstance(min_perc, float) and isinstance(max_perc, float)) or \
                (isinstance(min_perc, dict) and isinstance(max_perc, dict))
 
-        # save the min and max percentages of load
+        # save the min and max percentages of tr_load
         if isinstance(min_perc, float):
             assert 0 <= min_perc <= 1 and 0 <= max_perc <= 1 and min_perc <= max_perc
             self.min_cpu = self.min_ram = self.min_bw = min_perc

@@ -45,7 +45,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
             # if env is wrapped in TimeLimit, max arrival time of NSPRs is max episode length
             self.max_steps = self.env._max_episode_steps
             self.nsprs_duration = min(self.max_steps, 100)
-        except AttributeError:
+        except AttributeError or TypeError:
             self.nsprs_duration = 100
         # computed according to Sec. VII.C of HA-DRL paper
         self.arr_rate = self.load * self.tot_cpu_cap / self.nsprs_duration / self.cpu_req_per_vnf
@@ -103,30 +103,29 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
             raise NotImplementedError
             # this function is called only for low arrival rates
         else:
-            one_every_how_many_steps = 1 / self.arr_rate
-            decimal_part = round(one_every_how_many_steps - int(one_every_how_many_steps), 2)
-            one_every_how_many_steps = int(one_every_how_many_steps)
-            correction_every_how_many_steps = round(1 / decimal_part)
+            one_every_how_many_steps = round(1 / self.arr_rate)
+            # decimal_part = round(one_every_how_many_steps - int(one_every_how_many_steps), 2)
+            # one_every_how_many_steps = int(one_every_how_many_steps)
+            # correction_every_how_many_steps = round(1 / decimal_part)
             nsprs_dict = {}
             step = self.env.time_step
-            steps_without_correction = 0
+            # steps_without_correction = 0
             created_nsprs = 0
             while True:
-                if step % one_every_how_many_steps == 0 or \
-                        steps_without_correction == correction_every_how_many_steps:
+                if step % one_every_how_many_steps == 0:
                     cur_nspr = copy.deepcopy(self.nspr_model)
                     cur_nspr.graph['ArrivalTime'] = step
                     cur_nspr.graph['DepartureTime'] = step + self.nsprs_duration
                     nsprs_dict[step] = [cur_nspr]
                     created_nsprs += 1
-                    if step % one_every_how_many_steps == 0 and \
-                            steps_without_correction == correction_every_how_many_steps:
-                        nsprs_dict[step].append(copy.deepcopy(cur_nspr))
-                        created_nsprs += 1
-                    if steps_without_correction == correction_every_how_many_steps:
-                        steps_without_correction = 0
+                    # if step % one_every_how_many_steps == 0 and \
+                    #         steps_without_correction == correction_every_how_many_steps:
+                    #     nsprs_dict[step].append(copy.deepcopy(cur_nspr))
+                    #     created_nsprs += 1
+                    # if steps_without_correction == correction_every_how_many_steps:
+                    #     steps_without_correction = 0
                 step += 1
-                steps_without_correction += 1
+                # steps_without_correction += 1
                 if created_nsprs >= self.nsprs_per_ep or \
                         (self.max_steps is not None and step > self.max_steps):
                     break
