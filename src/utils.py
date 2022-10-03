@@ -16,6 +16,7 @@ def create_HADRL_PSN_file(
         intra_CDC_bw_cap: int = 100000,  # 100000 Mbps = 100 Gbps
         intra_EDC_bw_cap: int = 10000,  # 10000 Mbps = 10 Gbps
         outer_DC_bw_cap: int = 100000,  # 100000 Mbps = 100 Gbps
+        n_EDCs_per_CDC: int = 3,
 ):
     """ Initialize the PSN as in the HA-DRL paper
 
@@ -39,25 +40,28 @@ def create_HADRL_PSN_file(
         CDC_ids[-1, -1] + 1,
         CDC_ids[-1, -1] + 1 + n_ids_EDCs).reshape(n_EDCs, n_servers_per_EDC)
 
+    # one switch per DC (based on Fig. 1 in HA-DRL paper)
+    n_switches = n_CCPs + n_CDCs + n_EDCs
+    switches_ids = list(range(EDC_ids[-1, -1] + 1,
+                              EDC_ids[-1, -1] + 1 + n_switches))
+
     # one router per DC (based on Fig. 1 in HA-DRL paper)
-    # NOTE: the switches are not present in this implementation, but should be equivalent
     n_routers = n_CCPs + n_CDCs + n_EDCs
-    routers_ids = list(range(EDC_ids[-1, -1] + 1,
-                             EDC_ids[-1, -1] + 1 + n_routers))
+    routers_ids = list(range(switches_ids[-1] + 1, switches_ids[-1] + 1 + n_routers))
 
     # create graph
     g = nx.Graph(Label="HA-DRL PSN")
 
     # add nodes
-    _create_HADRL_nodes(g, CCP_ids, CDC_ids, EDC_ids, routers_ids,
-                             cpu_cap, ram_cap)
+    _create_HADRL_nodes(g, CCP_ids, CDC_ids, EDC_ids, routers_ids, switches_ids,
+                        cpu_cap, ram_cap)
 
     # add links
     _create_HADRL_links(
         g, n_CCPs, n_CDCs, n_EDCs, n_servers_per_CCP, n_servers_per_CDC,
-        n_servers_per_EDC, CCP_ids, CDC_ids, EDC_ids, routers_ids,
-        intra_CCP_bw_cap, intra_CDC_bw_cap, intra_EDC_bw_cap,
-        outer_DC_bw_cap)
+        n_servers_per_EDC, CCP_ids, CDC_ids, EDC_ids, switches_ids, routers_ids,
+        intra_CCP_bw_cap, intra_CDC_bw_cap, intra_EDC_bw_cap, outer_DC_bw_cap,
+        n_EDCs_per_CDC)
 
     # save graph
     nx.write_graphml(g, path)
@@ -68,6 +72,7 @@ def _create_HADRL_nodes(
         CCP_ids: Union[np.ndarray, List[int]],
         CDC_ids: Union[np.ndarray, List[int]],
         EDC_ids: Union[np.ndarray, List[int]],
+        switches_ids: Union[np.ndarray, List[int]],
         routers_ids: Union[np.ndarray, List[int]],
         cpu_cap: int,
         ram_cap: int,
@@ -76,8 +81,9 @@ def _create_HADRL_nodes(
                                      CDC_ids.flatten(),
                                      EDC_ids.flatten()))
     for server_id in all_server_ids:
-        g.add_node(server_id, NodeType="server", CPUcap=cpu_cap,
-                   RAMcap=ram_cap)
+        g.add_node(server_id, NodeType="server", CPUcap=cpu_cap, RAMcap=ram_cap)
+    for switch_id in switches_ids:
+        g.add_node(switch_id, NodeType="switch")
     for router_id in routers_ids:
         g.add_node(router_id, NodeType="router")
 
@@ -93,46 +99,57 @@ def _create_HADRL_links(
         CCP_ids: Union[np.ndarray, List[int]],
         CDC_ids: Union[np.ndarray, List[int]],
         EDC_ids: Union[np.ndarray, List[int]],
+        switches_ids: Union[np.ndarray, List[int]],
         routers_ids: Union[np.ndarray, List[int]],
         intra_CCP_bw_cap: int,
         intra_CDC_bw_cap: int,
         intra_EDC_bw_cap: int,
         outer_DC_bw_cap: int,
+        n_EDCs_per_CDC: int
 ):
+    CCPs_switches = switches_ids[:n_CCPs]
+    CDCs_switches = switches_ids[n_CCPs:n_CCPs + n_CDCs]
+    EDCs_switches = switches_ids[n_CCPs + n_CDCs:]
     CCPs_routers = routers_ids[:n_CCPs]
     CDCs_routers = routers_ids[n_CCPs:n_CCPs + n_CDCs]
     EDCs_routers = routers_ids[n_CCPs + n_CDCs:]
 
-    # CCPs' servers to their routers
+    # connect CCPs' servers to their switches
     for i in range(n_CCPs):
         for j in range(n_servers_per_CCP):
-            g.add_edge(CCP_ids[i, j], CCPs_routers[i],
-                       BWcap=intra_CCP_bw_cap)
+            g.add_edge(CCP_ids[i, j], CCPs_switches[i], BWcap=intra_CCP_bw_cap)
 
-    # CDCs' servers to their routers
+    # connect CDCs' servers to their switches
     for i in range(n_CDCs):
         for j in range(n_servers_per_CDC):
-            g.add_edge(CDC_ids[i, j], CDCs_routers[i],
-                       BWcap=intra_CDC_bw_cap)
+            g.add_edge(CDC_ids[i, j], CDCs_switches[i], BWcap=intra_CDC_bw_cap)
 
-    # EDCs' servers to their routers
+    # connect EDCs' servers to their switches
     for i in range(n_EDCs):
         for j in range(n_servers_per_EDC):
-            g.add_edge(EDC_ids[i, j], EDCs_routers[i],
-                       BWcap=intra_EDC_bw_cap)
+            g.add_edge(EDC_ids[i, j], EDCs_switches[i], BWcap=intra_EDC_bw_cap)
 
-    # CDCs' routers to CPPs' routers
+    # connect CCPs' switches to their routers
+    for i in range(len(CCPs_switches)):
+        g.add_edge(CCPs_switches[i], CCPs_routers[i], BWcap=intra_CCP_bw_cap)
+
+    # connect CDCs' servers to their routers
+    for i in range(len(CDCs_switches)):
+        g.add_edge(CDCs_switches[i], CDCs_routers[i], BWcap=intra_CDC_bw_cap)
+
+    # connect EDCs' servers to their routers
+    for i in range(len(EDCs_switches)):
+        g.add_edge(EDCs_switches[i], EDCs_routers[i], BWcap=intra_EDC_bw_cap)
+
+    # connect CDCs' routers to CPPs' routers
     for i in range(n_CDCs):
         # each CDC is connected to one CCP
         corresp_CCP = np.random.randint(0, n_CCPs)
-        g.add_edge(CDCs_routers[i], CCPs_routers[corresp_CCP],
-                   BWcap=outer_DC_bw_cap)
+        g.add_edge(CDCs_routers[i], CCPs_routers[corresp_CCP], BWcap=outer_DC_bw_cap)
 
     # connect each CDC's router to n EDCs' routers
-    n_EDCs_per_CDC = 3
     for i in range(n_CDCs):
-        corresp_EDCs = np.random.choice(n_EDCs, n_EDCs_per_CDC,
-                                        replace=False)
+        corresp_EDCs = np.random.choice(n_EDCs, n_EDCs_per_CDC, replace=False)
         for j in range(n_EDCs_per_CDC):
             g.add_edge(CDCs_routers[i], EDCs_routers[corresp_EDCs[j]],
                        BWcap=outer_DC_bw_cap)
@@ -141,6 +158,5 @@ def _create_HADRL_links(
     CDCs_and_EDCs_routers = np.concatenate((CDCs_routers, EDCs_routers))
     for i in range(len(CDCs_and_EDCs_routers)):
         g.add_edge(CDCs_and_EDCs_routers[i],
-                   CDCs_and_EDCs_routers[
-                       (i + 1) % len(CDCs_and_EDCs_routers)],
+                   CDCs_and_EDCs_routers[(i + 1) % len(CDCs_and_EDCs_routers)],
                    BWcap=outer_DC_bw_cap)

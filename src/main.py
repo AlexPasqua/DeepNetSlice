@@ -52,9 +52,10 @@ def make_env(
 if __name__ == '__main__':
     create_HADRL_PSN_file(
         path=psn_path,
-        n_CDCs=3,
-        n_EDCs=10,
-        n_servers_per_DC=(10, 5, 2)
+        n_CDCs=2,
+        n_EDCs=3,
+        n_servers_per_DC=(5, 3, 2),
+        n_EDCs_per_CDC=2
     )
 
     base_tr_env = NetworkSimulator(
@@ -77,10 +78,11 @@ if __name__ == '__main__':
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=1,
-        env_kwargs=dict(time_limit=False,
+        env_kwargs=dict(time_limit=True,
+                        # time_limit_kwargs=dict(max_episode_steps=100),
                         reset_with_rand_load=False,
                         hadrl_nsprs=True,
-                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=200, load=0.5)),
+                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=100, load=0.5)),
     )
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
@@ -88,14 +90,14 @@ if __name__ == '__main__':
                 n_steps=5,  # ogni quanti step fare un update
                 gamma=0.99,
                 ent_coef=0.0,
-                tensorboard_log="../tb_logs/",
+                # tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=base_tr_env.psn,
-                    features_extractor_class=HADRLFeaturesExtractor,
-                    features_extractor_kwargs=dict(
-                        psn=base_tr_env.psn,
-                        activation_fn=nn.functional.relu
-                    )
+                    # features_extractor_class=HADRLFeaturesExtractor,
+                    # features_extractor_kwargs=dict(
+                    #     psn=base_tr_env.psn,
+                    #     activation_fn=nn.functional.relu
+                    # )
                 ))
 
     print(model.policy)
@@ -123,7 +125,7 @@ if __name__ == '__main__':
         env_kwargs=dict(time_limit=False,
                         reset_with_rand_load=False,
                         hadrl_nsprs=True,
-                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=2)),
+                        hadrl_nsprs_kwargs=dict(nsprs_per_ep=2, load=0.5)),
     )
 
     list_of_callbacks = [
