@@ -6,6 +6,7 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from torch import nn
 
+import reader
 from callbacks import AcceptanceRatioCallback, HParamCallback
 from environments.network_simulator import NetworkSimulator
 from policies.features_extractors import HADRLFeaturesExtractor
@@ -58,12 +59,7 @@ if __name__ == '__main__':
         n_EDCs_per_CDC=2
     )
 
-    base_tr_env = NetworkSimulator(
-        psn_file=psn_path,
-        nsprs_path='../NSPRs/',
-        nsprs_per_episode=5,
-        nsprs_max_duration=100,
-    )
+    psn = reader.read_psn(psn_path)
 
     tr_nsprs_per_ep = 100
     tr_load = 0.5
@@ -72,8 +68,8 @@ if __name__ == '__main__':
 
     tr_env = make_vec_env(
         env_id=make_env,
-        n_envs=8,
-        env_kwargs=dict(time_limit=False,
+        n_envs=5,
+        env_kwargs=dict(time_limit=tr_time_limit,
                         # time_limit_kwargs=dict(max_episode_steps=100),
                         reset_with_rand_load=False,
                         hadrl_nsprs=True,
@@ -82,18 +78,14 @@ if __name__ == '__main__':
     )
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
-                learning_rate=0.01,
-                n_steps=20,  # ogni quanti step fare un update
+                learning_rate=0.005,
+                n_steps=10,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,
                 tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
-                    psn=base_tr_env.psn,
-                    # features_extractor_class=HADRLFeaturesExtractor,
-                    # features_extractor_kwargs=dict(
-                    #     psn=base_tr_env.psn,
-                    #     activation_fn=nn.functional.relu
-                    # )
+                    psn=psn,
+                    gcn_layers_dims=(120, 80, 60)
                 ))
 
     print(model.policy)

@@ -1,3 +1,4 @@
+import torch as th
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import HParam
 
@@ -92,7 +93,8 @@ class HParamCallback(BaseCallback):
             "PSN load (training)": self.tr_psn_load,
             "NSPRs per eval episode": self.eval_nsprs_per_ep,
             "PSN load (eval)": self.eval_psn_load,
-            "max steps per eval episode": self.eval_max_ep_steps
+            "max steps per eval episode": self.eval_max_ep_steps,
+            "GCN layers dimensions:": str(self.model.policy.gcn_layers_dims),
         }
         # define the metrics that will appear in the `HPARAMS` Tensorboard tab by referencing their tag
         # Tensorboard will find & display metrics from the `SCALARS` tab

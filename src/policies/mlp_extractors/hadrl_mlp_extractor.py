@@ -51,7 +51,14 @@ class HSDRLCritic(nn.Module):
 
 
 class HADRLActorCriticNet(nn.Module):
-    def __init__(self, observation_space: gym.Space, psn: nx.Graph, feature_dim: int, gcn_out_channels: int = 60, nspr_out_features: int = 4):
+    def __init__(
+            self,
+            observation_space: gym.Space,
+            psn: nx.Graph,
+            feature_dim: int,
+            gcn_out_channels: int = 60,
+            nspr_out_features: int = 4
+    ):
         super(HADRLActorCriticNet, self).__init__()
 
         # IMPORTANT:

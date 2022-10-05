@@ -21,13 +21,14 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             psn: nx.Graph,
             net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
             activation_fn: Type[nn.Module] = nn.Tanh,
-            gcn_out_channels: int = 60,
+            gcn_layers_dims: Tuple[int] = (60,),
             nspr_out_features: int = 4,
             *args,
             **kwargs,
     ):
         self.psn = psn
-        self.gcn_out_channels = gcn_out_channels
+        self.gcn_layers_dims = gcn_layers_dims  # saved in an attribute for logging purposes
+        self.gcn_out_channels = gcn_layers_dims[-1]
         self.nspr_out_features = nspr_out_features
 
         super(HADRLPolicy, self).__init__(
@@ -43,11 +44,11 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
 
         # non-shared features extractors for the actor and the critic
         self.policy_features_extractor = HADRLFeaturesExtractor(
-            observation_space, psn, th.tanh, gcn_out_channels,
+            observation_space, psn, th.tanh, gcn_layers_dims,
             nspr_out_features
         )
         self.value_features_extractor = HADRLFeaturesExtractor(
-            observation_space, psn, th.relu, gcn_out_channels,
+            observation_space, psn, th.relu, gcn_layers_dims,
             nspr_out_features
         )
         delattr(self, "features_extractor")  # remove the shared features extractor
