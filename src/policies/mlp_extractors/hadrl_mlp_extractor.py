@@ -12,41 +12,52 @@ class P2CHeuristic(nn.Module):
             self,
             action_space: gym.spaces.Space,
             servers_map_idx_id: Dict[int, int],
+            psn: nx.Graph,
     ):
         super().__init__()
         self.action_space = action_space
         self.servers_map_idx_id = servers_map_idx_id
+        self.psn = psn
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         max_values, max_idxs = th.max(x, dim=1)
+        heu_selected_servers = self.HEU(obs)
         pass
 
-    def HEU(self, obs: th.Tensor):
-        # actions (indexes of the servers in the servers list)
-        s1_idx = self.action_space.sample()
-        s2_idx = self.action_space.sample()
+    def HEU(self, obs: th.Tensor) -> th.Tensor:
+        """ P2C heuristic to select the servers where to place the current VNFs.
+        Selects one server for each environment (in case of vectorized envs).
 
-        # servers ids
-        s1_id = self.servers_map_idx_id[s1_idx]
-        s2_id = self.servers_map_idx_id[s2_idx]
-
-        # actual servers (nodes in the graph)
-        node1 = self.psn.nodes[s1_id]
-        node2 = self.psn.nodes[s2_id]
-
-        # compute the load balance of each server when placing the VNF
-        # TODO: check dimension of obs with vectorized env
+        :param obs: Observation
+        :return: indexes of the selected servers
+        """
+        n_envs = obs['bw_availabilities'].shape[0]
+        s1_idxs = th.empty(1, n_envs, dtype=th.int)
+        s2_idxs = th.empty(1, n_envs, dtype=th.int)
         req_cpu = obs['cur_vnf_cpu_req']
         req_ram = obs['cur_vnf_ram_req']
-        load_balance_1 = (node1['availCPU'] - req_cpu) / node1['CPUcap'] + \
-                         (node1['availRAM'] - req_ram) / node1['RAMcap']
-        load_balance_2 = (node2['availCPU'] - req_cpu) / node2['CPUcap'] + \
-                         (node2['availRAM'] - req_ram) / node2['RAMcap']
+        load_balance_1 = th.empty(1, n_envs)
+        load_balance_2 = th.empty(1, n_envs)
+        for i in range(n_envs):
+            # actions (indexes of the servers in the servers list)
+            s1_idxs[:, i] = self.action_space.sample()
+            s2_idxs[:, i] = self.action_space.sample()
+            # servers ids
+            id1 = self.servers_map_idx_id[s1_idxs[:, i].item()]
+            id2 = self.servers_map_idx_id[s2_idxs[:, i].item()]
+            # actual servers (nodes in the graph)
+            node1 = self.psn.nodes[id1]
+            node2 = self.psn.nodes[id2]
+            # compute the load balance of each server when placing the VNF
+            load_balance_1[:, i] = (node1['availCPU'] - req_cpu[i]) / node1['CPUcap'] + \
+                                   (node1['availRAM'] - req_ram[i]) / node1['RAMcap']
+            load_balance_2[:, i] = (node2['availCPU'] - req_cpu[i]) / node2['CPUcap'] + \
+                                   (node2['availRAM'] - req_ram[i]) / node2['RAMcap']
+        indexes = th.cat((s1_idxs, s2_idxs), dim=0)
 
-        # return the best server
-        indexes = [s1_idx, s2_idx]
-        winner = np.argmax([load_balance_1, load_balance_2])
-        return indexes[winner]
+        # return the best server for each environment (the indexes)
+        winners = th.argmax(th.cat((load_balance_1, load_balance_2)), dim=0, keepdim=True)
+        return th.gather(indexes, 0, winners)
 
 
 class HADRLActor(nn.Module):
@@ -65,7 +76,7 @@ class HADRLActor(nn.Module):
         self.linear = nn.Linear(
                 in_features=n_nodes * gcn_out_channels + nspr_out_features,
                 out_features=n_nodes)
-        self.heuristic = P2CHeuristic(action_space, servers_map_idx_id)
+        self.heuristic = P2CHeuristic(action_space, servers_map_idx_id, psn)
 
         # self.final_fcs = nn.Sequential(
         #     nn.Linear(

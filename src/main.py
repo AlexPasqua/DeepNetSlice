@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     tr_env = make_vec_env(
         env_id=make_env,
-        n_envs=1,
+        n_envs=4,
         env_kwargs=dict(time_limit=tr_time_limit,
                         # time_limit_kwargs=dict(max_episode_steps=100),
                         reset_with_rand_load=False,
@@ -85,7 +85,7 @@ if __name__ == '__main__':
                 # tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=psn,
-                    servers_map_id_idx=tr_env.get_attr('servers_map_idx_id', 0),
+                    servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
                     gcn_layers_dims=(120, 80, 60)
                 ))
 
