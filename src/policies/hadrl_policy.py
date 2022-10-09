@@ -92,7 +92,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         # Preprocess the observation if needed
         policy_features, value_features = self.extract_features(obs)
         latent_pi = self.mlp_extractor.forward_actor(policy_features, obs)
-        latent_vf = self.mlp_extractor.forward_critic(value_features, obs)
+        latent_vf = self.mlp_extractor.forward_critic(value_features)
 
         # Evaluate the values for the given observations
         values = self.value_net(latent_vf)
@@ -114,7 +114,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         """
         # Preprocess the observation if needed
         policy_features, value_features = self.extract_features(obs)
-        latent_pi = self.mlp_extractor.forward_actor(policy_features)
+        latent_pi = self.mlp_extractor.forward_actor(policy_features, obs)
         latent_vf = self.mlp_extractor.forward_critic(value_features)
         distribution = self._get_action_dist_from_latent(latent_pi)
         log_prob = distribution.log_prob(actions)
@@ -129,7 +129,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         :return: the action distribution.
         """
         policy_features, _ = self.extract_features(obs)
-        latent_pi = self.mlp_extractor.forward_actor(policy_features)
+        latent_pi = self.mlp_extractor.forward_actor(policy_features, obs)
         return self._get_action_dist_from_latent(latent_pi)
 
     def predict_values(self, obs: th.Tensor) -> th.Tensor:

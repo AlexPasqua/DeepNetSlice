@@ -111,7 +111,7 @@ class HADRLActor(nn.Module):
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         x = th.tanh(self.linear(x))
-        x = self.heuristic(x, obs)
+        # x = self.heuristic(x, obs)
         x = th.softmax(x, dim=1)
         return x
 
@@ -133,7 +133,7 @@ class HSDRLCritic(nn.Module):
             nn.ReLU()
         )
 
-    def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
+    def forward(self, x: th.Tensor) -> th.Tensor:
         # x = self.features_extractor(x)
         return self.final_fcs(x)
 
@@ -165,15 +165,15 @@ class HADRLActorCriticNet(nn.Module):
         self.value_net = HSDRLCritic(observation_space, psn, gcn_out_channels,
                                      nspr_out_features)
 
-    def forward(self, features: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
+    def forward(self, features: th.Tensor, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         """
         :return: (th.Tensor, th.Tensor) latent_policy, latent_value of the specified network.
             If all layers are shared, then ``latent_policy == latent_value``
         """
-        return self.policy_net(features), self.value_net(features)
+        return self.policy_net(features, obs), self.value_net(features)
 
     def forward_actor(self, features: th.Tensor, obs: th.Tensor) -> th.Tensor:
         return self.policy_net(features, obs)
 
-    def forward_critic(self, features: th.Tensor, obs: th.Tensor) -> th.Tensor:
-        return self.value_net(features, obs)
+    def forward_critic(self, features: th.Tensor) -> th.Tensor:
+        return self.value_net(features)

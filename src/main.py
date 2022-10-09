@@ -78,15 +78,15 @@ if __name__ == '__main__':
     )
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
-                learning_rate=0.005,
+                learning_rate=0.001,
                 n_steps=10,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,
-                # tensorboard_log="../tb_logs/",
+                tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                    gcn_layers_dims=(120, 80, 60)
+                    gcn_layers_dims=(60,)
                 ))
 
     print(model.policy)
