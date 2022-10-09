@@ -19,6 +19,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             action_space: gym.spaces.Space,
             lr_schedule: Callable[[float], float],
             psn: nx.Graph,
+            servers_map_idx_id: Dict[int, int],
             net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
             activation_fn: Type[nn.Module] = nn.Tanh,
             gcn_layers_dims: Tuple[int] = (60,),
@@ -30,6 +31,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         self.gcn_layers_dims = gcn_layers_dims  # saved in an attribute for logging purposes
         self.gcn_out_channels = gcn_layers_dims[-1]
         self.nspr_out_features = nspr_out_features
+        self.servers_map_idx_id = servers_map_idx_id
 
         super(HADRLPolicy, self).__init__(
             observation_space,
@@ -59,8 +61,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
 
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = HADRLActorCriticNet(
-            self.observation_space, self.psn, self.features_dim,
-            self.gcn_out_channels, self.nspr_out_features
+            self.observation_space, self.action_space, self.psn, self.servers_map_idx_id,
+            self.features_dim, self.gcn_out_channels, self.nspr_out_features
         )
 
     def extract_features(self, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
@@ -78,7 +80,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         value_features = self.value_features_extractor(preprocessed_obs)
         return policy_features, value_features
 
-    def forward(self, obs: th.Tensor, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def forward(self, obs: th.Tensor, deterministic: bool = False) -> \
+            Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Forward pass in all the networks (actor and critic)
 
@@ -88,8 +91,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         """
         # Preprocess the observation if needed
         policy_features, value_features = self.extract_features(obs)
-        latent_pi = self.mlp_extractor.forward_actor(policy_features)
-        latent_vf = self.mlp_extractor.forward_critic(value_features)
+        latent_pi = self.mlp_extractor.forward_actor(policy_features, obs)
+        latent_vf = self.mlp_extractor.forward_critic(value_features, obs)
 
         # Evaluate the values for the given observations
         values = self.value_net(latent_vf)
@@ -98,7 +101,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         log_prob = distribution.log_prob(actions)
         return actions, values, log_prob
 
-    def evaluate_actions(self, obs: th.Tensor, actions: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def evaluate_actions(self, obs: th.Tensor, actions: th.Tensor) -> \
+            Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Evaluate actions according to the current policy,
         given the observations.

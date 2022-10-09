@@ -49,12 +49,12 @@ class NetworkSimulator(gym.Env):
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
         nodes_ids = list(self.psn.nodes.keys())
-        self._map_id_idx = {nodes_ids[idx]: idx for idx in range(len(nodes_ids))}
+        self.map_id_idx = {nodes_ids[idx]: idx for idx in range(len(nodes_ids))}
 
         # map (dict) between an index of a list (incrementing int) and the ID of a server
         servers_ids = [node_id for node_id, node in self.psn.nodes.items()
                        if node['NodeType'] == 'server']
-        self._servers_map_idx_id = {idx: servers_ids[idx] for idx in range(len(servers_ids))}
+        self.servers_map_idx_id = {idx: servers_ids[idx] for idx in range(len(servers_ids))}
 
         # partial rewards to be accumulated across the steps of evaluation of a single NSPR
         self._acceptance_rewards = []
@@ -241,12 +241,12 @@ class NetworkSimulator(gym.Env):
         max_cpu = max_ram = max_bw = 0
         for node_id, node in self.psn.nodes.items():
             # get nodes' capacities (if routers, set these to 0)
-            cpu_availabilities[self._map_id_idx[node_id]] = node.get('availCPU', 0)
-            ram_availabilities[self._map_id_idx[node_id]] = node.get('availRAM', 0)
+            cpu_availabilities[self.map_id_idx[node_id]] = node.get('availCPU', 0)
+            ram_availabilities[self.map_id_idx[node_id]] = node.get('availRAM', 0)
             tot_bw = 0
             for extremes, link in self.psn.edges.items():
                 if node_id in extremes:
-                    bw_availabilities[self._map_id_idx[node_id]] += link['availBW']
+                    bw_availabilities[self.map_id_idx[node_id]] += link['availBW']
                     tot_bw += link['BWcap']
             # update the max CPU / RAM / BW capacities
             if node['NodeType'] == 'server':
@@ -321,7 +321,7 @@ class NetworkSimulator(gym.Env):
         :param action: the action to be performed
             more in detail, it's the index in the list of server corresponding
             ot a certain server ID, the mapping between this index and the
-            server ID is done in the self._servers_map_idx_id dictionary
+            server ID is done in the self.servers_map_idx_id dictionary
         :return: next observation, reward, done (True if the episode is over), info
         """
         reward, info = 0, {}
@@ -338,7 +338,7 @@ class NetworkSimulator(gym.Env):
 
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
-            physical_node_id = self._servers_map_idx_id[action]
+            physical_node_id = self.servers_map_idx_id[action]
             physical_node = self.psn.nodes[physical_node_id]
 
             if not self.enough_avail_resources(physical_node=physical_node, vnf=self.cur_vnf):
