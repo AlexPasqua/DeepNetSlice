@@ -8,21 +8,42 @@ from torch import nn
 
 
 class P2CHeuristic(nn.Module):
+    """ Layer executing the P2C heuristic """
+
     def __init__(
             self,
             action_space: gym.spaces.Space,
             servers_map_idx_id: Dict[int, int],
             psn: nx.Graph,
+            eta: float = 0.,
+            xi: float = 1.,
+            beta: float = 0.5,
     ):
+        """ Constructor
+
+        :param action_space: Action space
+        :param servers_map_idx_id: map (dict) between servers indexes (agent's actions) and their ids
+        :param psn: the env's physical substrate network
+        :param eta: hyperparameter of the P2C heuristic
+        :param xi: hyperparameter of the P2C heuristic
+        :param beta: hyperparameter of the P2C heuristic
+        """
         super().__init__()
         self.action_space = action_space
         self.servers_map_idx_id = servers_map_idx_id
         self.psn = psn
+        self.eta, self.xi, self.beta = eta, xi, beta
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
+        n_envs = x.shape[0]
         max_values, max_idxs = th.max(x, dim=1)
         heu_selected_servers = self.HEU(obs)
-        pass
+        H = th.zeros_like(x)
+        for i in range(n_envs):
+            heu_action = heu_selected_servers[:, i].item()
+            H[i, heu_action] = max_values[i] - x[i, heu_action] + self.eta
+        out = x + self.xi * th.pow(H, self.beta)
+        return out
 
     def HEU(self, obs: th.Tensor) -> th.Tensor:
         """ P2C heuristic to select the servers where to place the current VNFs.
@@ -91,6 +112,7 @@ class HADRLActor(nn.Module):
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         x = th.tanh(self.linear(x))
         x = self.heuristic(x, obs)
+        x = th.softmax(x, dim=1)
         return x
 
 

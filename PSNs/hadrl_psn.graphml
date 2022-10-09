@@ -190,10 +190,10 @@
     <edge source="24" target="18">
       <data key="d4">100000</data>
     </edge>
-    <edge source="24" target="27">
+    <edge source="24" target="28">
       <data key="d4">100000</data>
     </edge>
-    <edge source="24" target="28">
+    <edge source="24" target="27">
       <data key="d4">100000</data>
     </edge>
     <edge source="24" target="25">
@@ -205,7 +205,7 @@
     <edge source="25" target="26">
       <data key="d4">100000</data>
     </edge>
-    <edge source="25" target="28">
+    <edge source="25" target="27">
       <data key="d4">100000</data>
     </edge>
     <edge source="26" target="20">
