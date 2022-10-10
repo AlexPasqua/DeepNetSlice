@@ -14,6 +14,7 @@ class P2CHeuristic(nn.Module):
             action_space: gym.spaces.Space,
             servers_map_idx_id: Dict[int, int],
             psn: nx.Graph,
+            n_servers_to_sample: int = 2,
             eta: float = 0.,
             xi: float = 1.,
             beta: float = 1.,  # TODO: when not 1, could cause NaNs
@@ -31,52 +32,55 @@ class P2CHeuristic(nn.Module):
         self.action_space = action_space
         self.servers_map_idx_id = servers_map_idx_id
         self.psn = psn
+        self.n_servers_to_sample = n_servers_to_sample
         self.eta, self.xi, self.beta = eta, xi, beta
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         n_envs = x.shape[0]
         max_values, max_idxs = th.max(x, dim=1)
-        heu_selected_servers = self.HEU(obs)
+        heu_selected_servers = self.HEU(obs, self.n_servers_to_sample)
         H = th.zeros_like(x)
-        for i in range(n_envs):
-            heu_action = heu_selected_servers[:, i].item()
-            H[i, heu_action] = max_values[i] - x[i, heu_action] + self.eta
+        for e in range(n_envs):
+            heu_action = heu_selected_servers[e, :].item()
+            H[e, heu_action] = max_values[e] - x[e, heu_action] + self.eta
         out = x + self.xi * th.pow(H, self.beta)
         return out
 
-    def HEU(self, obs: th.Tensor) -> th.Tensor:
+    def HEU(self, obs: th.Tensor, n_servers_to_sample: int) -> th.Tensor:
         """ P2C heuristic to select the servers where to place the current VNFs.
         Selects one server for each environment (in case of vectorized envs).
 
         :param obs: Observation
+        :param n_servers_to_sample: number of servers to sample
         :return: indexes of the selected servers
         """
         n_envs = obs['bw_availabilities'].shape[0]
-        s1_idxs = th.empty(1, n_envs, dtype=th.int)
-        s2_idxs = th.empty(1, n_envs, dtype=th.int)
+        # s1_idxs = th.empty(1, n_envs, dtype=th.int)
+        # s2_idxs = th.empty(1, n_envs, dtype=th.int)
+        indexes = th.empty(n_envs, n_servers_to_sample, dtype=th.int)
         req_cpu = obs['cur_vnf_cpu_req']
         req_ram = obs['cur_vnf_ram_req']
-        load_balance_1 = th.empty(1, n_envs)
-        load_balance_2 = th.empty(1, n_envs)
-        for i in range(n_envs):
-            # actions (indexes of the servers in the servers list)
-            s1_idxs[:, i] = self.action_space.sample()
-            s2_idxs[:, i] = self.action_space.sample()
-            # servers ids
-            id1 = self.servers_map_idx_id[s1_idxs[:, i].item()]
-            id2 = self.servers_map_idx_id[s2_idxs[:, i].item()]
-            # actual servers (nodes in the graph)
-            node1 = self.psn.nodes[id1]
-            node2 = self.psn.nodes[id2]
-            # compute the load balance of each server when placing the VNF
-            load_balance_1[:, i] = (node1['availCPU'] - req_cpu[i]) / node1['CPUcap'] + \
-                                   (node1['availRAM'] - req_ram[i]) / node1['RAMcap']
-            load_balance_2[:, i] = (node2['availCPU'] - req_cpu[i]) / node2['CPUcap'] + \
-                                   (node2['availRAM'] - req_ram[i]) / node2['RAMcap']
-        indexes = th.cat((s1_idxs, s2_idxs), dim=0)
+        # load_balance_1 = th.empty(1, n_envs)
+        # load_balance_2 = th.empty(1, n_envs)
+        load_balances = th.empty(n_envs, n_servers_to_sample)
+        for e in range(n_envs):
+            for s in range(n_servers_to_sample):
+                # actions (indexes of the servers in the servers list)
+                indexes[e, s] = self.action_space.sample()
+                # servers ids
+                node_id = self.servers_map_idx_id[indexes[e, s].item()]
+                # actual servers (nodes in the graph)
+                node = self.psn.nodes[node_id]
+                # node1 = self.psn.nodes[id1]
+                # node2 = self.psn.nodes[id2]
+                # compute the load balance of each server when placing the VNF
+                cpu_load_balance = (node['availCPU'] - req_cpu[e]) / node['CPUcap']
+                ram_load_balance = (node['availRAM'] - req_ram[e]) / node['RAMcap']
+                load_balances[e, s] = cpu_load_balance + ram_load_balance
+        # indexes = th.cat((s1_idxs, s2_idxs), dim=0)
 
         # return the best server for each environment (the indexes)
-        winners = th.argmax(th.cat((load_balance_1, load_balance_2)), dim=0, keepdim=True)
+        winners = th.argmax(load_balances, dim=1, keepdim=True)
         return th.gather(indexes, 0, winners)
 
 

@@ -77,15 +77,15 @@ if __name__ == '__main__':
                                                 load=tr_load)),
     )
 
-    use_heuristic = False
-    heu_kwargs = {'eta': 0., 'xi': 0., 'beta': 0.}
+    use_heuristic = True
+    heu_kwargs = {'n_servers_to_sample': 10, 'eta': 0., 'xi': 0., 'beta': 0.}
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
                 learning_rate=0.05,
                 n_steps=10,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,
-                # tensorboard_log="../tb_logs/",
+                tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
