@@ -92,7 +92,9 @@ class HADRLActor(nn.Module):
             psn: nx.Graph,
             servers_map_idx_id: Dict[int, int],
             gcn_out_channels: int = 60,
-            nspr_out_features: int = 4
+            nspr_out_features: int = 4,
+            use_heuristic: bool = False,
+            heu_kwargs: dict = None,
     ):
         """ Constructor
 
@@ -101,18 +103,22 @@ class HADRLActor(nn.Module):
         :param servers_map_idx_id: map (dict) between servers indexes (agent's actions) and their ids
         :param gcn_out_channels: number of output channels of the GCN layer
         :param nspr_out_features: output dim of the layer that receives the NSPR state
+        :param use_heuristic: if True, actor will use P2C heuristic
         """
         super().__init__()
         n_nodes = len(psn.nodes)
+        self.use_heuristic = use_heuristic
+        # layers
         self.linear = nn.Linear(
             in_features=n_nodes * gcn_out_channels + nspr_out_features,
             out_features=n_nodes)
         self.heuristic = P2CHeuristic(
-            action_space, servers_map_idx_id, psn).requires_grad_(False)
+            action_space, servers_map_idx_id, psn, **heu_kwargs).requires_grad_(False)
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         x = th.tanh(self.linear(x))
-        x = self.heuristic(x, obs)
+        if self.use_heuristic:
+            x = self.heuristic(x, obs)
         x = th.softmax(x, dim=1)
         return x
 
@@ -161,7 +167,9 @@ class HADRLActorCriticNet(nn.Module):
             servers_map_idx_id: Dict[int, int],
             feature_dim: int,
             gcn_out_channels: int = 60,
-            nspr_out_features: int = 4
+            nspr_out_features: int = 4,
+            use_heuristic: bool = False,
+            heu_kwargs: dict = None,
     ):
         """ Constructor
 
@@ -171,6 +179,7 @@ class HADRLActorCriticNet(nn.Module):
         :param feature_dim:
         :param gcn_out_channels: number of output channels of the GCN layer
         :param nspr_out_features: output dim of the layer that receives the NSPR state
+        :param use_heuristic: if True, actor will use P2C heuristic
         """
         super(HADRLActorCriticNet, self).__init__()
 
@@ -180,7 +189,8 @@ class HADRLActorCriticNet(nn.Module):
         self.latent_dim_vf = 1
         # policy network
         self.policy_net = HADRLActor(action_space, psn, servers_map_idx_id,
-                                     gcn_out_channels, nspr_out_features)
+                                     gcn_out_channels, nspr_out_features,
+                                     use_heuristic, heu_kwargs)
         # value network
         self.value_net = HSDRLCritic(psn, gcn_out_channels, nspr_out_features)
 

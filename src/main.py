@@ -77,16 +77,21 @@ if __name__ == '__main__':
                                                 load=tr_load)),
     )
 
+    use_heuristic = False
+    heu_kwargs = {'eta': 0., 'xi': 0., 'beta': 0.}
+
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
                 learning_rate=0.05,
                 n_steps=10,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,
-                tensorboard_log="../tb_logs/",
+                # tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                    gcn_layers_dims=(60,)
+                    gcn_layers_dims=(60,),
+                    use_heuristic=use_heuristic,
+                    heu_kwargs=heu_kwargs,
                 ))
 
     print(model.policy)
@@ -113,7 +118,8 @@ if __name__ == '__main__':
                        tr_max_ep_steps=tr_max_ep_steps if tr_time_limit else None,
                        eval_nsprs_per_ep=eval_nsprs_per_ep,
                        eval_psn_load=eval_load,
-                       eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None),
+                       eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
+                       use_heuristic=use_heuristic,),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1, warn=True,
                      eval_freq=1000, deterministic=True, verbose=2,

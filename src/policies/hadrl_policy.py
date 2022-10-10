@@ -24,6 +24,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             activation_fn: Type[nn.Module] = nn.Tanh,
             gcn_layers_dims: Tuple[int] = (60,),
             nspr_out_features: int = 4,
+            use_heuristic: bool = False,
+            heu_kwargs: dict = None,
             *args,
             **kwargs,
     ):
@@ -32,6 +34,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         self.gcn_out_channels = gcn_layers_dims[-1]
         self.nspr_out_features = nspr_out_features
         self.servers_map_idx_id = servers_map_idx_id
+        self.use_heuristic = use_heuristic
+        self.heu_kwargs = heu_kwargs
 
         super(HADRLPolicy, self).__init__(
             observation_space,
@@ -62,7 +66,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = HADRLActorCriticNet(
             self.action_space, self.psn, self.servers_map_idx_id,
-            self.features_dim, self.gcn_out_channels, self.nspr_out_features
+            self.features_dim, self.gcn_out_channels, self.nspr_out_features,
+            self.use_heuristic, self.heu_kwargs
         )
 
     def extract_features(self, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:

@@ -64,6 +64,7 @@ class HParamCallback(BaseCallback):
             eval_nsprs_per_ep: int = None,
             eval_psn_load: float = None,
             eval_max_ep_steps: int = None,
+            use_heuristic: bool = False,
     ):
         """
         Saves the hyperparameters and metrics at the start of the training,
@@ -79,6 +80,7 @@ class HParamCallback(BaseCallback):
         self.eval_nsprs_per_ep = eval_nsprs_per_ep
         self.eval_psn_load = eval_psn_load
         self.eval_max_ep_steps = eval_max_ep_steps
+        self.use_heuristic = use_heuristic
 
     def _on_training_start(self) -> None:
         hparam_dict = {
@@ -95,6 +97,7 @@ class HParamCallback(BaseCallback):
             "PSN load (eval)": self.eval_psn_load,
             "max steps per eval episode": self.eval_max_ep_steps,
             "GCN layers dimensions:": str(self.model.policy.gcn_layers_dims),
+            "Use P2C heuristic": self.use_heuristic,
         }
         # define the metrics that will appear in the `HPARAMS` Tensorboard tab by referencing their tag
         # Tensorboard will find & display metrics from the `SCALARS` tab
