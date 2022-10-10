@@ -51,13 +51,13 @@ def make_env(
 
 
 if __name__ == '__main__':
-    create_HADRL_PSN_file(
-        path=psn_path,
-        n_CDCs=2,
-        n_EDCs=3,
-        n_servers_per_DC=(5, 3, 2),
-        n_EDCs_per_CDC=2
-    )
+    # create_HADRL_PSN_file(
+    #     path=psn_path,
+    #     n_CDCs=2,
+    #     n_EDCs=3,
+    #     n_servers_per_DC=(5, 3, 2),
+    #     n_EDCs_per_CDC=2
+    # )
 
     psn = reader.read_psn(psn_path)
 
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     tr_env = make_vec_env(
         env_id=make_env,
-        n_envs=4,
+        n_envs=8,
         env_kwargs=dict(time_limit=tr_time_limit,
                         # time_limit_kwargs=dict(max_episode_steps=100),
                         reset_with_rand_load=False,
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     )
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
-                learning_rate=0.001,
+                learning_rate=0.05,
                 n_steps=10,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,

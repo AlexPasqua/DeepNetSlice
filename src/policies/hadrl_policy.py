@@ -61,7 +61,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
 
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = HADRLActorCriticNet(
-            self.observation_space, self.action_space, self.psn, self.servers_map_idx_id,
+            self.action_space, self.psn, self.servers_map_idx_id,
             self.features_dim, self.gcn_out_channels, self.nspr_out_features
         )
 
