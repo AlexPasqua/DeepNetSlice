@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     tr_env = make_vec_env(
         env_id=make_env,
-        n_envs=8,
+        n_envs=5,
         env_kwargs=dict(time_limit=tr_time_limit,
                         # time_limit_kwargs=dict(max_episode_steps=100),
                         reset_with_rand_load=False,
@@ -77,19 +77,19 @@ if __name__ == '__main__':
                                                 load=tr_load)),
     )
 
-    use_heuristic = True
-    heu_kwargs = {'n_servers_to_sample': 10, 'eta': 0., 'xi': 0., 'beta': 0.}
+    use_heuristic = False
+    heu_kwargs = {'n_servers_to_sample': 10, 'eta': 0., 'xi': 0.7, 'beta': 1.}
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
                 learning_rate=0.05,
-                n_steps=10,  # ogni quanti step fare un update
+                n_steps=20,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,
-                tensorboard_log="../tb_logs/",
+                tensorboard_log="../tb_logs2/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                    gcn_layers_dims=(60,),
+                    gcn_layers_dims=(60, 30, 10),
                     use_heuristic=use_heuristic,
                     heu_kwargs=heu_kwargs,
                 ))
@@ -119,7 +119,7 @@ if __name__ == '__main__':
                        eval_nsprs_per_ep=eval_nsprs_per_ep,
                        eval_psn_load=eval_load,
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
-                       use_heuristic=use_heuristic,),
+                       use_heuristic=use_heuristic, heu_kwargs=heu_kwargs,),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1, warn=True,
                      eval_freq=1000, deterministic=True, verbose=2,
