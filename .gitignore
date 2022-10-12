@@ -132,4 +132,4 @@ dmypy.json
 .pyre/
 
 # project-specific stuff
-tb_logs/
+tb_logs*

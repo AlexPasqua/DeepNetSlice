@@ -132,6 +132,7 @@ class HSDRLCritic(nn.Module):
 
     [1] https://ieeexplore.ieee.org/document/9632824
     """
+
     def __init__(
             self,
             psn: nx.Graph,
@@ -147,8 +148,9 @@ class HSDRLCritic(nn.Module):
         super().__init__()
         n_nodes = len(psn.nodes)
         self.final_fcs = nn.Sequential(
-            nn.Linear(in_features=n_nodes * gcn_out_channels + nspr_out_features,
-                      out_features=n_nodes),
+            nn.Linear(
+                in_features=n_nodes * gcn_out_channels + nspr_out_features,
+                out_features=n_nodes),
             nn.ReLU(),
             nn.Linear(in_features=n_nodes, out_features=1),
             nn.ReLU()
@@ -164,6 +166,7 @@ class HADRLActorCriticNet(nn.Module):
 
     [1] https://ieeexplore.ieee.org/document/9632824
     """
+
     def __init__(
             self,
             action_space: gym.Space,

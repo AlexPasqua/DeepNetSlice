@@ -58,6 +58,7 @@ class HParamCallback(BaseCallback):
     def __init__(
             self,
             n_tr_envs: int = None,
+            n_eval_envs: int = None,
             tr_nsprs_per_ep: int = None,
             tr_psn_load: float = None,
             tr_max_ep_steps: int = None,
@@ -75,6 +76,7 @@ class HParamCallback(BaseCallback):
         """
         super().__init__()
         self.n_tr_envs = n_tr_envs
+        self.n_eval_envs = n_eval_envs
         self.tr_nsprs_per_ep = tr_nsprs_per_ep
         self.tr_psn_load = tr_psn_load
         self.tr_max_ep_steps = tr_max_ep_steps
@@ -88,6 +90,7 @@ class HParamCallback(BaseCallback):
         hparam_dict = {
             "algorithm": self.model.__class__.__name__,
             "n training envs": self.n_tr_envs,
+            "n eval envs": self.n_eval_envs,
             "n steps before update": self.model.n_steps,
             "learning rate": self.model.learning_rate,
             "gamma": self.model.gamma,

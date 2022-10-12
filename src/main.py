@@ -85,7 +85,7 @@ if __name__ == '__main__':
                 n_steps=20,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,
-                tensorboard_log="../tb_logs2/",
+                tensorboard_log="../tb_logs3/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     list_of_callbacks = [
         AcceptanceRatioCallback(name="Acceptance ratio", verbose=2),
 
-        HParamCallback(tr_env.num_envs, tr_nsprs_per_ep, tr_load,
+        HParamCallback(tr_env.num_envs, eval_env.num_envs, tr_nsprs_per_ep, tr_load,
                        tr_max_ep_steps=tr_max_ep_steps if tr_time_limit else None,
                        eval_nsprs_per_ep=eval_nsprs_per_ep,
                        eval_psn_load=eval_load,
