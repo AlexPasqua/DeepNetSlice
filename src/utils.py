@@ -1,7 +1,53 @@
-from typing import Tuple, Union, List
+from typing import Tuple, Union, List, Optional
 
+import gym
 import networkx as nx
 import numpy as np
+
+from environments.network_simulator import NetworkSimulator
+from wrappers import ResetWithRandLoad, NSPRsGeneratorHADRL
+
+
+def make_env(
+        psn_path: str,
+        base_env_kwargs: Optional[dict] = None,
+        time_limit: bool = False,
+        time_limit_kwargs: Optional[dict] = None,
+        reset_with_rand_load: bool = False,
+        reset_with_rand_load_kwargs: Optional[dict] = None,
+        hadrl_nsprs: bool = False,
+        hadrl_nsprs_kwargs: Optional[dict] = None,
+):
+    """ Create the environment.
+    It can be wrapped with different wrappers, all with their own arguments.
+    They wrappers are namely: TimeLimit, ResetWithRandLoad, NSPRsGeneratorHADRL.
+
+    :param psn_path: path to the PSN file
+    :param base_env_kwargs: kwargs of the base environment
+    :param time_limit: if True, the env is wrapped with TimeLimit wrapper
+    :param time_limit_kwargs: kwargs of the TimeLimit wrapper
+    :param reset_with_rand_load: if True, the env is wrapped with ResetWithRandLoad wrapper
+    :param reset_with_rand_load_kwargs: kwargs for the ResetWithRandLoad wrapper
+    :param hadrl_nsprs: if True, the env is wrapped with NSPRsGeneratorHADRL wrapper
+    :param hadrl_nsprs_kwargs: kwargs for the NSPRsGeneratorHADRL wrapper
+    """
+    base_env_kwargs = {} if base_env_kwargs is None else base_env_kwargs
+    time_limit_kwargs = {} if time_limit_kwargs is None else time_limit_kwargs
+    reset_with_rand_load_kwargs = {} if reset_with_rand_load_kwargs is None else reset_with_rand_load_kwargs
+
+    env = NetworkSimulator(psn_file=psn_path,
+        **base_env_kwargs
+        # nsprs_path='../NSPRs/',
+        # nsprs_per_episode=50,
+        # nsprs_max_duration=30,
+    )
+    if time_limit:
+        env = gym.wrappers.TimeLimit(env, **time_limit_kwargs)
+    if reset_with_rand_load:
+        env = ResetWithRandLoad(env, **reset_with_rand_load_kwargs)
+    if hadrl_nsprs:
+        env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
+    return env
 
 
 def create_HADRL_PSN_file(
@@ -20,10 +66,18 @@ def create_HADRL_PSN_file(
 ):
     """ Initialize the PSN as in the HA-DRL paper
 
+    :param path: path where to save the file defining the PSN
     :param n_CCPs: number of CCPs
     :param n_CDCs: number of CDCs
     :param n_EDCs: number of EDCs
     :param n_servers_per_DC: tuple with the number of servers per (CCP, CDC, EDC)
+    :param cpu_cap: CPU capacity per server
+    :param ram_cap: RAM capacity per server
+    :param intra_CCP_bw_cap: bandwidth of links within a CCP
+    :param intra_CDC_bw_cap: bandwidth of links within a CDC
+    :param intra_EDC_bw_cap: bandwidth of links within a EDC
+    :param outer_DC_bw_cap: bandwidth of links between DCs
+    :param n_EDCs_per_CDC: number of EDCs connected to each CDC
     """
     # number of servers per DC category
     n_servers_per_CCP, n_servers_per_CDC, n_servers_per_EDC = n_servers_per_DC

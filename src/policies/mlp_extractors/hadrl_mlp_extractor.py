@@ -63,6 +63,8 @@ class P2CHeuristic(nn.Module):
         load_balances = th.empty(n_envs, n_servers_to_sample)
         for e in range(n_envs):
             feasible_servers = self._get_feasible_servers(obs, e)
+            if len(feasible_servers) < 17:
+                pass
             for s in range(n_servers_to_sample):
                 # actions (indexes of the servers in the servers list)
                 indexes[e, s] = random.sample(feasible_servers, 1)[0]
