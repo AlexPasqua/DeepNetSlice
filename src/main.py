@@ -5,18 +5,18 @@ from stable_baselines3.common.env_util import make_vec_env
 import reader
 from callbacks import AcceptanceRatioCallback, HParamCallback
 from policies.hadrl_policy import HADRLPolicy
-from utils import make_env
+from utils import make_env, create_HADRL_PSN_file
 
 if __name__ == '__main__':
     psn_path = '../PSNs/hadrl_psn.graphml'
 
-    # create_HADRL_PSN_file(
-    #     path=psn_path,
-    #     n_CDCs=1,
-    #     n_EDCs=1,
-    #     n_servers_per_DC=(1, 1, 1),
-    #     n_EDCs_per_CDC=1
-    # )
+    create_HADRL_PSN_file(
+        path=psn_path,
+        n_CDCs=2,
+        n_EDCs=3,
+        n_servers_per_DC=(5, 3, 2),
+        n_EDCs_per_CDC=2
+    )
 
     psn = reader.read_psn(psn_path)
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[
                         0],
-                    gcn_layers_dims=(60, 30, 10),
+                    gcn_layers_dims=(60,),
                     use_heuristic=use_heuristic,
                     heu_kwargs=heu_kwargs,
                 ))
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     print(model.policy)
 
     eval_time_limit = False
-    eval_nsprs_per_ep = 100
+    eval_nsprs_per_ep = 1
     eval_load = 0.5
     eval_max_ep_steps = 100
 
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     ]
 
     model.learn(total_timesteps=1000000,
-                log_interval=100,
+                log_interval=10,
                 callback=list_of_callbacks)
 
     # obs = env.reset()

@@ -157,7 +157,7 @@ class NetworkSimulator(gym.Env):
             cur_nspr = self.nsprs[arrival_time]
             for nspr in cur_nspr:
                 departed = nspr.graph.get('departed', False)
-                if nspr.graph['DepartureTime'] <= self.time_step and not departed:
+                if nspr.graph['DepartureTime'] < self.time_step and not departed:
                     self.restore_avail_resources(nspr=nspr)
                     if nspr == self.cur_nspr:
                         # haven't finished placing this NSPR, but its departure time has come.
@@ -339,6 +339,9 @@ class NetworkSimulator(gym.Env):
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
         self.pick_next_nspr()
 
+        # increase time step
+        self.time_step += 1
+
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
             physical_node_id = self.servers_map_idx_id[action]
@@ -435,9 +438,6 @@ class NetworkSimulator(gym.Env):
 
         # new observation
         obs = self.get_observation()
-
-        # increase time step
-        self.time_step += 1
 
         return obs, reward, self.done, info
 
