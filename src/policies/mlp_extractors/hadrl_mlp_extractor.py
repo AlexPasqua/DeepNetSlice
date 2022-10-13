@@ -39,8 +39,11 @@ class P2CHeuristic(nn.Module):
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         n_envs = x.shape[0]
         max_values, max_idxs = th.max(x, dim=1)
-        heu_selected_servers = self.HEU(obs, self.n_servers_to_sample)
         H = th.zeros_like(x)
+        heu_selected_servers = self.HEU(obs, self.n_servers_to_sample)
+        if th.all(heu_selected_servers == -1):
+            # it means no selected action by the heuristic
+            return H
         for e in range(n_envs):
             heu_action = heu_selected_servers[e, :].item()
             H[e, heu_action] = max_values[e] - x[e, heu_action] + self.eta
@@ -60,11 +63,10 @@ class P2CHeuristic(nn.Module):
         req_cpu = obs['cur_vnf_cpu_req']
         req_ram = obs['cur_vnf_ram_req']
         req_bw = obs['cur_vnf_bw_req']
-        load_balances = th.empty(n_envs, n_servers_to_sample)
+        load_balances = th.zeros(n_envs, n_servers_to_sample)
         for e in range(n_envs):
             feasible_servers = self._get_feasible_servers(obs, e)
-            if len(feasible_servers) < 17:
-                pass
+            n_servers_to_sample = min(n_servers_to_sample, len(feasible_servers))
             for s in range(n_servers_to_sample):
                 # actions (indexes of the servers in the servers list)
                 indexes[e, s] = random.sample(feasible_servers, 1)[0]
@@ -76,10 +78,12 @@ class P2CHeuristic(nn.Module):
                 cpu_load_balance = (node['availCPU'] - req_cpu[e]) / node['CPUcap']
                 ram_load_balance = (node['availRAM'] - req_ram[e]) / node['RAMcap']
                 load_balances[e, s] = cpu_load_balance + ram_load_balance
-        # indexes = th.cat((s1_idxs, s2_idxs), dim=0)
 
         # return the best server for each environment (the indexes)
         winners = th.argmax(load_balances, dim=1, keepdim=True)
+        if th.all(load_balances == 0):
+            # it means no selected action by the heuristic
+            return -th.ones_like(th.gather(indexes, 0, winners))
         return th.gather(indexes, 0, winners)
 
     @staticmethod

@@ -4,6 +4,7 @@ from typing import Union, Tuple
 import gym
 import networkx as nx
 import numpy as np
+import torch as th
 
 import reader
 
@@ -277,6 +278,8 @@ class NetworkSimulator(gym.Env):
                           'vnfs_still_to_place': np.array([0], dtype=int)}
 
         # instance of an observation from the environment
+        mm = np.max(cpu_availabilities)
+        mi = np.min(cpu_availabilities)
         obs = {
             'cpu_availabilities': cpu_availabilities,
             'ram_availabilities': ram_availabilities,
