@@ -10,24 +10,24 @@ from utils import make_env, create_HADRL_PSN_file
 if __name__ == '__main__':
     psn_path = '../PSNs/hadrl_psn.graphml'
 
-    create_HADRL_PSN_file(
-        path=psn_path,
-        n_CDCs=2,
-        n_EDCs=3,
-        n_servers_per_DC=(5, 3, 2),
-        n_EDCs_per_CDC=2
-    )
+    # create_HADRL_PSN_file(
+    #     path=psn_path,
+    #     # n_CDCs=2,
+    #     # n_EDCs=3,
+    #     # n_servers_per_DC=(5, 3, 2),
+    #     # n_EDCs_per_CDC=2
+    # )
 
     psn = reader.read_psn(psn_path)
 
     tr_nsprs_per_ep = 100
-    tr_load = 0.9
+    tr_load = 0.5
     tr_time_limit = False
     tr_max_ep_steps = 100
 
     tr_env = make_vec_env(
         env_id=make_env,
-        n_envs=1,
+        n_envs=5,
         env_kwargs=dict(
             psn_path=psn_path,
             time_limit=tr_time_limit,
@@ -39,20 +39,19 @@ if __name__ == '__main__':
         ),
     )
 
-    use_heuristic = True
+    use_heuristic = False
     heu_kwargs = {'n_servers_to_sample': 10, 'eta': 0., 'xi': 0.7, 'beta': 1.}
 
     model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
                 learning_rate=0.05,
-                n_steps=20,  # ogni quanti step fare un update
+                n_steps=10,  # ogni quanti step fare un update
                 gamma=0.8,
                 ent_coef=0.01,
-                # tensorboard_log="../tb_logs3/",
+                tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=psn,
-                    servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[
-                        0],
-                    gcn_layers_dims=(60,),
+                    servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
+                    gcn_layers_dims=(60, 30, 60,),
                     use_heuristic=use_heuristic,
                     heu_kwargs=heu_kwargs,
                 ))
@@ -60,7 +59,7 @@ if __name__ == '__main__':
     print(model.policy)
 
     eval_time_limit = False
-    eval_nsprs_per_ep = 1
+    eval_nsprs_per_ep = 100
     eval_load = 0.5
     eval_max_ep_steps = 100
 

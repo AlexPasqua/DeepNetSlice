@@ -58,7 +58,7 @@ class P2CHeuristic(nn.Module):
         :param n_servers_to_sample: number of servers to sample
         :return: indexes of the selected servers
         """
-        n_envs = obs['bw_availabilities'].shape[0]
+        n_envs = obs['bw_avails'].shape[0]
         indexes = th.empty(n_envs, n_servers_to_sample, dtype=th.int)
         req_cpu = obs['cur_vnf_cpu_req']
         req_ram = obs['cur_vnf_ram_req']
@@ -113,10 +113,10 @@ class P2CHeuristic(nn.Module):
 
         # iterate over servers and save the eligible ones
         eligible_ones = []
-        for s in range(len(obs['cpu_availabilities'][env_idx])):
-            avail_cpu = obs['cpu_availabilities'][env_idx][s].item()
-            avail_ram = obs['ram_availabilities'][env_idx][s].item()
-            avail_bw = obs['bw_availabilities'][env_idx][s].item()
+        for s in range(len(obs['cpu_avails'][env_idx])):
+            avail_cpu = obs['cpu_avails'][env_idx][s].item()
+            avail_ram = obs['ram_avails'][env_idx][s].item()
+            avail_bw = obs['bw_avails'][env_idx][s].item()
 
             # if the node is a server (and not a router or switch)
             if avail_cpu > 0 and avail_ram > 0:

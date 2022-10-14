@@ -54,15 +54,15 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
                               out_features=nspr_out_features)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        len_rollout_buffer = len(observations['cpu_availabilities'])
+        len_rollout_buffer = len(observations['cpu_avails'])
 
         # features extraction of the PSN state
         psn_state = th.empty(
             size=(len_rollout_buffer, self.n_nodes, self.n_features),
             dtype=th.float)
-        psn_state[:, :, 0] = observations['cpu_availabilities']
-        psn_state[:, :, 1] = observations['ram_availabilities']
-        psn_state[:, :, 2] = observations['bw_availabilities']
+        psn_state[:, :, 0] = observations['cpu_avails']
+        psn_state[:, :, 1] = observations['ram_avails']
+        psn_state[:, :, 2] = observations['bw_avails']
         psn_state[:, :, 3] = observations['placement_state']
 
         # pass the psn_state through the GCN layers

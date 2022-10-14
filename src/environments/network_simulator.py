@@ -1,3 +1,4 @@
+import copy
 import math
 from typing import Union, Tuple
 
@@ -74,10 +75,10 @@ class NetworkSimulator(gym.Env):
         self.action_space = gym.spaces.Discrete(len(servers_ids))
         self.observation_space = gym.spaces.Dict({
             # PSN STATE
-            'cpu_availabilities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
-            'ram_availabilities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'cpu_avails': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'ram_avails': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
             # for each physical node, sum of the BW of the physical links connected to it
-            'bw_availabilities': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'bw_avails': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
             # for each physical node, number of VNFs of the current NSPR placed on it
             'placement_state': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
 
@@ -89,6 +90,8 @@ class NetworkSimulator(gym.Env):
             'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
             'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
         })
+        self._empty_psn_obs_dict = None     # used to store the observation resulting from an empty PSN
+        self._obs_dict = self._init_obs_dict()     # used to store the current observation
 
     @property
     def cur_vnf(self):
@@ -100,17 +103,17 @@ class NetworkSimulator(gym.Env):
         self._resource_consumption_rewards = []
         self._load_balancing_rewards = []
 
-    @staticmethod
-    def enough_avail_resources(physical_node: dict, vnf: dict) -> bool:
+    def enough_avail_resources(self, physical_node_id: int, vnf: dict) -> bool:
         """ Check that the physical node has enough resources to satisfy the VNF's requirements
 
-        :param physical_node: physical node to check
+        :param physical_node_id: ID of the physical node to check
         :param vnf: VNF to check
         :return: True if the physical node has enough resources to satisfy the VNF's requirements, False otherwise
         """
-        if physical_node['availCPU'] < vnf['reqCPU'] or physical_node['availRAM'] < vnf['reqRAM']:
-            return False
-        return True
+        idx = self.map_id_idx[physical_node_id]
+        enough_cpu = self._obs_dict['cpu_avails'][idx] >= vnf['reqCPU'] / self.max_cpu
+        enough_ram = self._obs_dict['ram_avails'][idx] >= vnf['reqRAM'] / self.max_ram
+        return enough_cpu and enough_ram
 
     def restore_avail_resources(self, nspr: nx.Graph):
         """ Method called in case a NSPR is not accepted, or it has reached
@@ -124,16 +127,24 @@ class NetworkSimulator(gym.Env):
             for vnf_id, vnf in nspr.nodes.items():
                 # restore nodes' resources availabilities
                 if vnf['placed'] >= 0:
-                    physical_node = self.psn.nodes[vnf['placed']]
-                    physical_node['availCPU'] += vnf['reqCPU']
-                    physical_node['availRAM'] += vnf['reqRAM']
+                    idx = self.map_id_idx[vnf['placed']]
+                    self._obs_dict['cpu_avails'][idx] += vnf['reqCPU'] / self.max_cpu
+                    self._obs_dict['ram_avails'][idx] += vnf['reqRAM'] / self.max_ram
             for _, vl in nspr.edges.items():
                 # restore links' resources availabilities
                 if vl['placed']:
                     # vl['placed'] is the list of the physical nodes traversed by the link
+                    rewBW_normalized = vl['reqBW'] / self.max_bw
                     for i in range(len(vl['placed']) - 1):
-                        physical_link = self.psn.edges[vl['placed'][i], vl['placed'][i + 1]]
+                        id_1 = vl['placed'][i]
+                        id_2 = vl['placed'][i + 1]
+                        physical_link = self.psn.edges[id_1, id_2]
+                        # recall that BW in physical links is actually updated
                         physical_link['availBW'] += vl['reqBW']
+                        idx_1 = self.map_id_idx[id_1]
+                        idx_2 = self.map_id_idx[id_2]
+                        self._obs_dict['bw_avails'][idx_1] += rewBW_normalized
+                        self._obs_dict['bw_avails'][idx_2] += rewBW_normalized
 
     def pick_next_nspr(self):
         """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
@@ -154,8 +165,8 @@ class NetworkSimulator(gym.Env):
         for arrival_time in all_arrival_times:
             if arrival_time >= self.time_step:
                 break
-            cur_nspr = self.nsprs[arrival_time]
-            for nspr in cur_nspr:
+            cur_nsprs = self.nsprs[arrival_time]
+            for nspr in cur_nsprs:
                 departed = nspr.graph.get('departed', False)
                 if nspr.graph['DepartureTime'] < self.time_step and not departed:
                     self.restore_avail_resources(nspr=nspr)
@@ -226,68 +237,105 @@ class NetworkSimulator(gym.Env):
         """
         return 1 if link['availBW'] >= self._cur_vl_reqBW else math.inf
 
-    def get_observation(self) -> GymObs:
-        """ Method used to get the observation of the environment.
-
-        :return: an instance of an observation from the environment
+    def _init_obs_dict(self) -> dict:
         """
+        Initialize the observation dict.
+
+        To be called after reading a PSN and before placing any VNF/VL on it.
+        """
+        # check that the env has a PSN
+        try:
+            if self.psn is None:
+                raise ValueError("self.psn is None")
+        except AttributeError:
+            raise AttributeError("self.psn is not defined")
+
         # initialize lists
-        cpu_availabilities = np.zeros(len(self.psn.nodes), dtype=np.float32)
-        ram_availabilities = np.zeros(len(self.psn.nodes), dtype=np.float32)
-        bw_availabilities = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        cpu_avails = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        ram_avails = np.zeros(len(self.psn.nodes), dtype=np.float32)
+        bw_avails = np.zeros(len(self.psn.nodes), dtype=np.float32)
         placement_state = np.zeros(len(self.psn.nodes), dtype=int)
 
-        # TODO: this could probably be made more efficient
         # scan all nodes and save data in lists
-        max_cpu = max_ram = max_bw = 0
+        self.max_cpu = self.max_ram = self.max_bw = 0
         for node_id, node in self.psn.nodes.items():
             # get nodes' capacities (if routers, set these to 0)
-            cpu_availabilities[self.map_id_idx[node_id]] = node.get('availCPU', 0)
-            ram_availabilities[self.map_id_idx[node_id]] = node.get('availRAM', 0)
+            cpu_avails[self.map_id_idx[node_id]] = node.get('availCPU', 0)
+            ram_avails[self.map_id_idx[node_id]] = node.get('availRAM', 0)
             tot_bw = 0
             for extremes, link in self.psn.edges.items():
                 if node_id in extremes:
-                    bw_availabilities[self.map_id_idx[node_id]] += link['availBW']
+                    bw_avails[self.map_id_idx[node_id]] += link['availBW']
                     tot_bw += link['BWcap']
             # update the max CPU / RAM / BW capacities
             if node['NodeType'] == 'server':
-                if node['CPUcap'] > max_cpu:
-                    max_cpu = node['CPUcap']
-                if node['RAMcap'] > max_ram:
-                    max_ram = node['RAMcap']
-            if tot_bw > max_bw:
-                max_bw = tot_bw
+                if node['CPUcap'] > self.max_cpu:
+                    self.max_cpu = node['CPUcap']
+                if node['RAMcap'] > self.max_ram:
+                    self.max_ram = node['RAMcap']
+            if tot_bw > self.max_bw:
+                self.max_bw = tot_bw
 
         # normalize the quantities
-        cpu_availabilities = cpu_availabilities / max_cpu
-        ram_availabilities = ram_availabilities / max_ram
-        bw_availabilities = bw_availabilities / max_bw
+        cpu_avails /= self.max_cpu
+        ram_avails /= self.max_ram
+        bw_avails /= self.max_bw
 
+        obs = {
+            # PSN state
+            'cpu_avails': cpu_avails,
+            'ram_avails': ram_avails,
+            'bw_avails': bw_avails,
+            'placement_state': placement_state,
+            # NSPR state
+            'cur_vnf_cpu_req': np.array([0], dtype=int),
+            'cur_vnf_ram_req': np.array([0], dtype=int),
+            'cur_vnf_bw_req': np.array([0], dtype=int),
+            'vnfs_still_to_place': np.array([0], dtype=int)
+        }
+
+        # store the obs for an empty PSN
+        del self._empty_psn_obs_dict
+        self._empty_psn_obs_dict = copy.deepcopy(obs)
+
+        return obs
+
+    def get_observation(self) -> GymObs:
+        """ Get an observation from the environment.
+
+        The PSN state is already dynamically kept updated, so this method
+        will only collect data about the NSPR state and complete the observation
+        dict, that will be returned.
+
+        :return: an instance of an observation from the environment
+        """
         # state regarding the NSPR
         if self.cur_vnf is not None:
-            cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=self.cur_vnf_id, nspr=self.cur_nspr)
-            nspr_state = {
-                'cur_vnf_cpu_req': np.array([self.cur_vnf['reqCPU'] / max_cpu], dtype=float),
-                'cur_vnf_ram_req': np.array([self.cur_vnf['reqRAM'] / max_ram], dtype=float),
-                'cur_vnf_bw_req': np.array([sum(vl['reqBW'] / max_bw for vl in cur_vnf_vls.values())], dtype=float),
-                'vnfs_still_to_place': np.array([len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)}
-        else:
-            nspr_state = {'cur_vnf_cpu_req': np.array([0], dtype=int),
-                          'cur_vnf_ram_req': np.array([0], dtype=int),
-                          'cur_vnf_bw_req': np.array([0], dtype=int),
-                          'vnfs_still_to_place': np.array([0], dtype=int)}
+            cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=self.cur_vnf_id,
+                                               nspr=self.cur_nspr)
+            cur_vnf_cpu_req = np.array(
+                [self.cur_vnf['reqCPU'] / self.max_cpu], dtype=float)
 
-        # instance of an observation from the environment
-        mm = np.max(cpu_availabilities)
-        mi = np.min(cpu_availabilities)
-        obs = {
-            'cpu_availabilities': cpu_availabilities,
-            'ram_availabilities': ram_availabilities,
-            'bw_availabilities': bw_availabilities,
-            'placement_state': placement_state,
-            **nspr_state
-        }
-        return obs
+            cur_vnf_ram_req = np.array(
+                [self.cur_vnf['reqRAM'] / self.max_ram], dtype=float)
+
+            cur_vnf_bw_req = np.array(
+                [sum([vl['reqBW'] for vl in cur_vnf_vls.values()]) / self.max_bw],
+                dtype=float)
+
+            vnfs_still_to_place = np.array(
+                [len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)
+        else:
+            cur_vnf_cpu_req = np.array([0], dtype=float)
+            cur_vnf_ram_req = np.array([0], dtype=float)
+            cur_vnf_bw_req = np.array([0], dtype=float)
+            vnfs_still_to_place = np.array([0], dtype=int)
+
+        self._obs_dict['cur_vnf_cpu_req'] = cur_vnf_cpu_req
+        self._obs_dict['cur_vnf_ram_req'] = cur_vnf_ram_req
+        self._obs_dict['cur_vnf_bw_req'] = cur_vnf_bw_req
+        self._obs_dict['vnfs_still_to_place'] = vnfs_still_to_place
+        return self._obs_dict
 
     def reset(self, **kwargs) -> GymObs:
         """ Method used to reset the environment
@@ -300,6 +348,7 @@ class NetworkSimulator(gym.Env):
         self.cur_nspr = None
 
         # reset network status (simply re-read the PSN file)
+        # (needed because the available BW of the links gets actually modified)
         self.psn = reader.read_psn(graphml_file=self.psn_file)
 
         self.ep_number += 1
@@ -315,8 +364,15 @@ class NetworkSimulator(gym.Env):
         # reset partial rewards to be accumulated across the episodes' steps
         self.reset_partial_rewards()
 
-        obs = self.get_observation()
-        return obs
+        # return the obs corresponding to an empty PSN:
+        # ALTERNATIVE 1: slower, but runs through the network and works with changing PSNs
+        # self._obs_dict = self._init_obs_dict()
+
+        # ALTERNATIVE 2: slightly faster on paper, but does not work with changing PSNs
+        del self._obs_dict
+        self._obs_dict = copy.deepcopy(self._empty_psn_obs_dict)
+
+        return self._obs_dict
 
     def step(self, action: int) -> Tuple[GymObs, float, bool, dict]:
         """ Perform an action in the environment
@@ -347,20 +403,22 @@ class NetworkSimulator(gym.Env):
             physical_node_id = self.servers_map_idx_id[action]
             physical_node = self.psn.nodes[physical_node_id]
 
-            if not self.enough_avail_resources(physical_node=physical_node, vnf=self.cur_vnf):
+            if not self.enough_avail_resources(physical_node_id, self.cur_vnf):
                 # the VNF cannot be placed on the physical node
                 obs, reward = self.manage_unsuccessful_action()
                 return obs, reward, self.done, info
 
-            # update the resources availabilities of the physical node
+            # update the resources availabilities of the physical node in the obs dict
             self.cur_vnf['placed'] = physical_node_id
-            physical_node['availCPU'] -= self.cur_vnf['reqCPU']
-            physical_node['availRAM'] -= self.cur_vnf['reqRAM']
+            idx = self.map_id_idx[physical_node_id]
+            self._obs_dict['cpu_avails'][idx] -= self.cur_vnf['reqCPU'] / self.max_cpu
+            self._obs_dict['ram_avails'][idx] -= self.cur_vnf['reqRAM'] / self.max_ram
+
             # update acceptance reward and tr_load balancing reward
             self._acceptance_rewards.append(self.rval_accepted_vnf)
             self._load_balancing_rewards.append(
-                physical_node['availCPU'] / physical_node['CPUcap'] +
-                physical_node['availRAM'] / physical_node['RAMcap']
+                self._obs_dict['cpu_avails'][idx] * self.max_cpu / physical_node['CPUcap'] +
+                self._obs_dict['ram_avails'][idx] * self.max_ram / physical_node['RAMcap']
             )
 
             # connect the placed VNF to the other VNFs it's supposed to be connected to
@@ -396,6 +454,12 @@ class NetworkSimulator(gym.Env):
                         # and update the resources availabilities of physical links involved
                         for i in range(len(psn_path) - 1):
                             physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
+                            extreme1_idx = self.map_id_idx[psn_path[i]]
+                            extreme2_idx = self.map_id_idx[psn_path[i + 1]]
+                            self._obs_dict['bw_avails'][extreme1_idx] -= vl['reqBW'] / self.max_bw
+                            self._obs_dict['bw_avails'][extreme2_idx] -= vl['reqBW'] / self.max_bw
+                            # note: here the PSN is actually modified: the available
+                            # BW of the link is decreased. Needed for shortest path computation
                             physical_link['availBW'] -= vl['reqBW']
                             if physical_link['availBW'] < 0:
                                 exceeded_bw = True
@@ -413,7 +477,7 @@ class NetworkSimulator(gym.Env):
                 # aggregate the resource consumption rewards into a single value for this action
                 n_VLs_placed_now = len(self._cur_resource_consumption_rewards)
                 if n_VLs_placed_now == 0:
-                    self._resource_consumption_rewards.append(1)
+                    self._resource_consumption_rewards.append(1.)
                 else:
                     self._resource_consumption_rewards.append(
                         sum(self._cur_resource_consumption_rewards) / n_VLs_placed_now)
