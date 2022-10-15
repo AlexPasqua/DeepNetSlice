@@ -10,13 +10,13 @@ from utils import make_env, create_HADRL_PSN_file
 if __name__ == '__main__':
     psn_path = '../PSNs/hadrl_psn.graphml'
 
-    # create_HADRL_PSN_file(
-    #     path=psn_path,
-    #     # n_CDCs=2,
-    #     # n_EDCs=3,
-    #     # n_servers_per_DC=(5, 3, 2),
-    #     # n_EDCs_per_CDC=2
-    # )
+    create_HADRL_PSN_file(
+        path=psn_path,
+        # n_CDCs=2,
+        # n_EDCs=3,
+        # n_servers_per_DC=(5, 3, 2),
+        # n_EDCs_per_CDC=2
+    )
 
     psn = reader.read_psn(psn_path)
 

@@ -9,6 +9,8 @@ from torch import nn
 from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 
+device = th.device("cuda" if th.cuda.is_available() else "cpu")
+
 
 class HADRLFeaturesExtractor(BaseFeaturesExtractor):
     """
@@ -42,7 +44,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         edges = th.tensor(np.array(psn.edges).reshape((len(psn.edges), 2)),
                           dtype=th.long)
         double_edges = th.cat((edges, th.flip(edges, dims=(1,))))
-        self.edge_index = double_edges.t().contiguous()
+        self.edge_index = double_edges.t().contiguous().to(device)
 
         # GCN layers
         gcn_layers_dims = [nspr_out_features] + list(gcn_layers_dims)
@@ -66,14 +68,14 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         psn_state[:, :, 3] = observations['placement_state']
 
         # pass the psn_state through the GCN layers
-        gcn_out = psn_state
+        gcn_out = psn_state.to(device)
         for i in range(len(self.gcn_layers)):
             gcn_out = self.activation(self.gcn_layers[i](gcn_out, self.edge_index))
         gcn_out = gcn_out.flatten(start_dim=1)
 
         # features extraction of the NSPR state
         nspr_state = th.empty(size=(len_rollout_buffer, 1, self.n_features),
-                              dtype=th.float)
+                              dtype=th.float).to(device)
         nspr_state[:, :, 0] = observations['cur_vnf_cpu_req']
         nspr_state[:, :, 1] = observations['cur_vnf_ram_req']
         nspr_state[:, :, 2] = observations['cur_vnf_bw_req']
