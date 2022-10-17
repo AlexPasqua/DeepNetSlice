@@ -10,6 +10,7 @@ from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
+device = "cpu"
 
 
 class HADRLFeaturesExtractor(BaseFeaturesExtractor):
