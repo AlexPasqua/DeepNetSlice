@@ -5,7 +5,7 @@ import networkx as nx
 import torch as th
 from torch import nn
 
-from heuristic_layers import P2CLoadBalanceHeuristic
+from heuristic_layers import P2CLoadBalanceHeuristic, HADRLHeuristic
 
 
 class HADRLActor(nn.Module):
@@ -40,7 +40,11 @@ class HADRLActor(nn.Module):
         self.linear = nn.Linear(
             in_features=n_nodes * gcn_out_channels + nspr_out_features,
             out_features=n_nodes)
-        self.heuristic = P2CLoadBalanceHeuristic(
+
+        # self.heuristic = P2CLoadBalanceHeuristic(
+        #     action_space, servers_map_idx_id, psn, **heu_kwargs).requires_grad_(False)
+
+        self.heuristic = HADRLHeuristic(
             action_space, servers_map_idx_id, psn, **heu_kwargs).requires_grad_(False)
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
@@ -51,7 +55,7 @@ class HADRLActor(nn.Module):
         return x
 
 
-class HSDRLCritic(nn.Module):
+class HADRLCritic(nn.Module):
     """ Critic network for the HA-DRL [1] algorithm
 
     [1] https://ieeexplore.ieee.org/document/9632824
@@ -123,7 +127,7 @@ class HADRLActorCriticNet(nn.Module):
                                      gcn_out_channels, nspr_out_features,
                                      use_heuristic, heu_kwargs)
         # value network
-        self.value_net = HSDRLCritic(psn, gcn_out_channels, nspr_out_features)
+        self.value_net = HADRLCritic(psn, gcn_out_channels, nspr_out_features)
 
     def forward(self, features: th.Tensor, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         """
