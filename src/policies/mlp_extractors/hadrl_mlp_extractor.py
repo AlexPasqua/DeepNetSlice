@@ -36,16 +36,19 @@ class HADRLActor(nn.Module):
         super().__init__()
         n_nodes = len(psn.nodes)
         self.use_heuristic = use_heuristic
+        if 'heu_class' in heu_kwargs:
+            heu_class = heu_kwargs['heu_class']
+            del heu_kwargs['heu_class']
+        else:
+            heu_class = HADRLHeuristic
+
         # layers
         self.linear = nn.Linear(
             in_features=n_nodes * gcn_out_channels + nspr_out_features,
             out_features=n_nodes)
 
-        # self.heuristic = P2CLoadBalanceHeuristic(
-        #     action_space, servers_map_idx_id, psn, **heu_kwargs).requires_grad_(False)
-
-        self.heuristic = HADRLHeuristic(
-            action_space, servers_map_idx_id, psn, **heu_kwargs).requires_grad_(False)
+        self.heuristic = heu_class(action_space, servers_map_idx_id, psn,
+                                   **heu_kwargs).requires_grad_(False)
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         x = th.tanh(self.linear(x))

@@ -13,6 +13,10 @@ from .mlp_extractors.hadrl_mlp_extractor import HADRLActorCriticNet
 
 
 class HADRLPolicy(MultiInputActorCriticPolicy):
+    """ Policy network from the paper HA-DRL [1]
+
+    [1] https://ieeexplore.ieee.org/document/9632824
+    """
     def __init__(
             self,
             observation_space: gym.spaces.Space,
@@ -29,6 +33,19 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             *args,
             **kwargs,
     ):
+        """
+        :param observation_space: Observation space of the agent
+        :param action_space: Action space of the agent
+        :param lr_schedule: Learning rate schedule
+        :param psn: Physical Service Network
+        :param servers_map_idx_id: Mapping between servers' indexes and their IDs
+        :param net_arch: architecture of the policy and value networks after the feature extractor
+        :param activation_fn: Activation function
+        :param gcn_layers_dims: Dimensions of the GCN layers
+        :param nspr_out_features: Number of output features of the NSPR state
+        :param use_heuristic: Whether to use the heuristic or not
+        :param heu_kwargs: Keyword arguments for the heuristic
+        """
         self.psn = psn
         self.gcn_layers_dims = gcn_layers_dims  # saved in an attribute for logging purposes
         self.gcn_out_channels = gcn_layers_dims[-1]
