@@ -36,11 +36,7 @@ class HADRLActor(nn.Module):
         super().__init__()
         n_nodes = len(psn.nodes)
         self.use_heuristic = use_heuristic
-        if 'heu_class' in heu_kwargs:
-            heu_class = heu_kwargs['heu_class']
-            del heu_kwargs['heu_class']
-        else:
-            heu_class = HADRLHeuristic
+        heu_class = heu_kwargs.get('heu_class', HADRLHeuristic)
 
         # layers
         self.linear = nn.Linear(

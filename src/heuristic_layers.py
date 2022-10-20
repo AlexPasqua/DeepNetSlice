@@ -21,6 +21,7 @@ class P2CLoadBalanceHeuristic(nn.Module):
             eta: float = 0.,
             xi: float = 1.,
             beta: float = 1.,  # TODO: when not 1, could cause NaNs
+            **kwargs
     ):
         """ Constructor
 
@@ -92,6 +93,7 @@ class HADRLHeuristic(nn.Module):
             eta: float = 0.,
             xi: float = 1.,
             beta: float = 1.,  # TODO: when not 1, could cause NaNs
+            **kwargs
     ):
         """ Constructor
 

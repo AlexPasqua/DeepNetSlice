@@ -85,6 +85,10 @@ class HParamCallback(BaseCallback):
         self.eval_max_ep_steps = eval_max_ep_steps
         self.use_heuristic = use_heuristic
         self.heu_kwargs = heu_kwargs if heu_kwargs is not None else {}
+        if 'heu_class' in self.heu_kwargs:
+            self.heu_class = self.heu_kwargs['heu_class'](None, None, None).__class__.__name__
+        else:
+            self.heu_class = None
 
     def _on_training_start(self) -> None:
         hparam_dict = {
@@ -102,10 +106,12 @@ class HParamCallback(BaseCallback):
             "PSN load (eval)": self.eval_psn_load,
             "max steps per eval episode": self.eval_max_ep_steps,
             "GCN layers dimensions": str(self.model.policy.gcn_layers_dims),
-            "Use P2C heuristic": self.use_heuristic,
-            "P2C's eta": self.heu_kwargs.get("eta", None),
-            "P2C's xi": self.heu_kwargs.get("xi", None),
-            "P2C's beta": self.heu_kwargs.get("beta", None),
+            "Use heuristic": self.use_heuristic,
+            "Heuristic class": self.heu_class,
+            "heu's num sampled servers": self.heu_kwargs.get("n_servers_to_sample", None),
+            "heu's eta": self.heu_kwargs.get("eta", None),
+            "heu's xi": self.heu_kwargs.get("xi", None),
+            "heu's beta": self.heu_kwargs.get("beta", None),
         }
         # define the metrics that will appear in the `HPARAMS` Tensorboard tab by referencing their tag
         # Tensorboard will find & display metrics from the `SCALARS` tab

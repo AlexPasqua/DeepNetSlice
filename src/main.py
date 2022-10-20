@@ -41,19 +41,20 @@ if __name__ == '__main__':
     )
 
     use_heuristic = True
-    heu_kwargs = {'n_servers_to_sample': 10, 'heu_class': P2CLoadBalanceHeuristic,
-                  'eta': 0., 'xi': 0.7, 'beta': 1.}
+    heu_kwargs = {'n_servers_to_sample': 10, 'heu_class': HADRLHeuristic,
+                  'eta': 0.05, 'xi': 1., 'beta': 1.}
 
-    model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='auto',
+    model = A2C(policy=HADRLPolicy, env=tr_env, verbose=2, device='cuda:1',
                 learning_rate=0.05,
                 n_steps=10,  # ogni quanti step fare un update
-                gamma=0.8,
-                ent_coef=0.01,
-                # tensorboard_log="../tb_logs/",
+                gamma=0.7,
+                ent_coef=0.05,
+                use_rms_prop=True,
+                tensorboard_log="../tb_logs/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                    gcn_layers_dims=(60, 60, 60,),
+                    gcn_layers_dims=(60, 60, 60, 60,),
                     use_heuristic=use_heuristic,
                     heu_kwargs=heu_kwargs,
                 ))
@@ -89,16 +90,17 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        EvalCallback(eval_env=eval_env, n_eval_episodes=1, warn=True,
-                     eval_freq=1000, deterministic=True, verbose=2,
+        EvalCallback(eval_env=eval_env, n_eval_episodes=2, warn=True,
+                     eval_freq=10000, deterministic=True, verbose=2,
                      callback_after_eval=AcceptanceRatioCallback(
                          name="Eval acceptance ratio",
                          verbose=2
                      ))
     ]
 
-    model.learn(total_timesteps=1000000,
-                log_interval=10,
+    model.learn(total_timesteps=10000000,
+                log_interval=100,
+                # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
     # obs = env.reset()
