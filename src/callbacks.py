@@ -1,4 +1,4 @@
-import torch as th
+import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import HParam
 
@@ -40,17 +40,14 @@ class AcceptanceRatioCallback(BaseCallback):
 
         :return: (bool) If the callback returns False, training is aborted early.
         """
-        list_of_totals = self.training_env.get_attr("tot_nsprs")
-        list_of_accepted = self.training_env.get_attr("accepted_nsprs")
-        local_accept_ratios = []
-        for i, tot in enumerate(list_of_totals):
-            if tot > 0:
-                cur_accept_ratio = list_of_accepted[i] / tot
-                local_accept_ratios.append(cur_accept_ratio)
-        n_ratios = len(local_accept_ratios)
-        if n_ratios > 0:
-            overall_accept_ratio = sum(local_accept_ratios) / n_ratios
-            self.logger.record(self.name, overall_accept_ratio)
+        accepted_nsprs_per_env = np.array(self.training_env.get_attr("accepted_nsprs"), dtype=np.float32)
+        tot_nsprs_per_env = np.array(self.training_env.get_attr("tot_nsprs"), dtype=np.float32)
+        accept_ratio_per_env = np.divide(accepted_nsprs_per_env,
+                                         tot_nsprs_per_env,
+                                         out=np.zeros_like(tot_nsprs_per_env),
+                                         where=tot_nsprs_per_env != 0)
+        overall_accept_ratio = np.mean(accept_ratio_per_env)
+        self.logger.record(self.name, overall_accept_ratio)
         return True
 
 

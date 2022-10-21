@@ -30,7 +30,7 @@ if __name__ == '__main__':
     tr_max_ep_steps = 100
     tr_env = make_vec_env(
         env_id=make_env,
-        n_envs=1,
+        n_envs=4,
         env_kwargs=dict(
             psn_path=psn_path,
             time_limit=tr_time_limit,
@@ -72,7 +72,7 @@ if __name__ == '__main__':
                 gamma=0.7,
                 ent_coef=0.0001,
                 use_rms_prop=True,
-                # tensorboard_log="../tb_logs_simple_psn/",
+                tensorboard_log="../tb_logs_prova/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
@@ -91,15 +91,15 @@ if __name__ == '__main__':
         "policy_type": policy,
         "total_timesteps": tot_tr_steps,
     }
-    # wandb_run = wandb.init(
-    #     project="Tesi",
-    #     dir="../",
-    #     name="simple PSN",
-    #     config=config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     # monitor_gym=True,  # auto-upload the videos of agents playing the game
-    #     # save_code=True,  # optional
-    # )
+    wandb_run = wandb.init(
+        project="Tesi",
+        dir="../prova",
+        name="simple PSN",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        # monitor_gym=True,  # auto-upload the videos of agents playing the game
+        # save_code=True,  # optional
+    )
 
     # training callbacks
     list_of_callbacks = [
@@ -113,7 +113,7 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        # WandbCallback(model_save_path=f"../models/{wandb_run.id}", verbose=2),
+        WandbCallback(model_save_path=f"../models_prova/{wandb_run.id}", verbose=2),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=2, warn=True,
                      eval_freq=10000, deterministic=True, verbose=2,
