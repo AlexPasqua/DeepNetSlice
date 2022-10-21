@@ -130,6 +130,7 @@ class NetworkSimulator(gym.Env):
                     idx = self.map_id_idx[vnf['placed']]
                     self._obs_dict['cpu_avails'][idx] += vnf['reqCPU'] / self.max_cpu
                     self._obs_dict['ram_avails'][idx] += vnf['reqRAM'] / self.max_ram
+                    self._obs_dict['placement_state'][idx] -= 1
             for _, vl in nspr.edges.items():
                 # restore links' resources availabilities
                 if vl['placed']:
@@ -413,6 +414,7 @@ class NetworkSimulator(gym.Env):
             idx = self.map_id_idx[physical_node_id]
             self._obs_dict['cpu_avails'][idx] -= self.cur_vnf['reqCPU'] / self.max_cpu
             self._obs_dict['ram_avails'][idx] -= self.cur_vnf['reqRAM'] / self.max_ram
+            self._obs_dict['placement_state'][idx] += 1
 
             # update acceptance reward and tr_load balancing reward
             self._acceptance_rewards.append(self.rval_accepted_vnf)
