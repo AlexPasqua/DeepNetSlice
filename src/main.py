@@ -16,21 +16,21 @@ if __name__ == '__main__':
     create_HADRL_PSN_file(
         path=psn_path,
         n_CDCs=2,
-        n_EDCs=4,
+        n_EDCs=6,
         n_servers_per_DC=(5, 3, 2),
-        n_EDCs_per_CDC=2
+        n_EDCs_per_CDC=3
     )
 
     psn = reader.read_psn(psn_path)
 
     # training environment
-    tr_nsprs_per_ep = 3
+    tr_nsprs_per_ep = 4
     tr_load = 0.5
     tr_time_limit = False
     tr_max_ep_steps = 100
     tr_env = make_vec_env(
         env_id=make_env,
-        n_envs=4,
+        n_envs=1,
         env_kwargs=dict(
             psn_path=psn_path,
             time_limit=tr_time_limit,
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     # evaluation environment
     eval_time_limit = False
-    eval_nsprs_per_ep = 3
+    eval_nsprs_per_ep = 4
     eval_load = 0.5
     eval_max_ep_steps = 100
     eval_env = make_vec_env(

@@ -154,9 +154,7 @@ class NetworkSimulator(gym.Env):
             self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
             self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
             self.tot_nsprs += 1
-            self.nsprs_seen_in_cur_ep += 1
-            if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
-                self.done = True
+            _ = self.update_nspr_state()    # _obs_dict updated withing method
 
     def check_for_departed_nsprs(self):
         """ Checks it some NSPRs have reached their departure time and in case
@@ -191,9 +189,13 @@ class NetworkSimulator(gym.Env):
         self.restore_avail_resources(nspr=self.cur_nspr)
         self.reset_partial_rewards()
         self.cur_nspr = None
+        self.nsprs_seen_in_cur_ep += 1
+        if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
+            self.done = True
         self.pick_next_nspr()
-        obs = self.get_observation()
+        obs = self.update_nspr_state()
         reward = self.rval_rejected_vnf
+        self.time_step += 1
         return obs, reward
 
     def _normal_reward_as_hadrl(self, reward):
@@ -301,7 +303,7 @@ class NetworkSimulator(gym.Env):
 
         return obs
 
-    def get_observation(self) -> GymObs:
+    def update_nspr_state(self) -> GymObs:
         """ Get an observation from the environment.
 
         The PSN state is already dynamically kept updated, so this method
@@ -325,7 +327,7 @@ class NetworkSimulator(gym.Env):
                 dtype=float)
 
             vnfs_still_to_place = np.array(
-                [len(self.cur_nspr_unplaced_vnfs_ids)], dtype=int)
+                [len(self.cur_nspr_unplaced_vnfs_ids) + 1], dtype=int)
         else:
             cur_vnf_cpu_req = np.array([0], dtype=float)
             cur_vnf_ram_req = np.array([0], dtype=float)
@@ -395,9 +397,6 @@ class NetworkSimulator(gym.Env):
         self.check_for_departed_nsprs()
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
         self.pick_next_nspr()
-
-        # increase time step
-        self.time_step += 1
 
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
@@ -491,6 +490,9 @@ class NetworkSimulator(gym.Env):
                 reward = 0  # global reward is non-zero only after the whole NSPR is placed
             else:
                 # it means we finished the VNFs of the current NSPR
+                self.nsprs_seen_in_cur_ep += 1
+                if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
+                    self.done = True
                 # update global reward because the NSPR is fully placed
                 reward = np.stack((self._acceptance_rewards,
                                    self._resource_consumption_rewards,
@@ -503,7 +505,10 @@ class NetworkSimulator(gym.Env):
                 self.accepted_nsprs += 1
 
         # new observation
-        obs = self.get_observation()
+        obs = self.update_nspr_state()
+
+        # increase time step
+        self.time_step += 1
 
         return obs, reward, self.done, info
 
