@@ -84,7 +84,7 @@ if __name__ == '__main__':
     print(model.policy)
 
     # define some training hyperparams
-    tot_tr_steps = 10000000
+    tot_tr_steps = 100000
 
     # wandb stuff
     config = {
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     wandb_run = wandb.init(
         project="Tesi",
         dir="../prova",
-        name="simple PSN",
+        name="acceptance ratio test",
         config=config,
         sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
         # monitor_gym=True,  # auto-upload the videos of agents playing the game
@@ -103,7 +103,8 @@ if __name__ == '__main__':
 
     # training callbacks
     list_of_callbacks = [
-        AcceptanceRatioCallback(name="Acceptance ratio", verbose=2),
+        AcceptanceRatioCallback(env=tr_env, name="Acceptance ratio",
+                                steps_per_tr_phase=1000, verbose=2),
 
         HParamCallback(tr_env.num_envs, eval_env.num_envs, tr_nsprs_per_ep,
                        tr_load,
@@ -116,26 +117,27 @@ if __name__ == '__main__':
         WandbCallback(model_save_path=f"../models_prova/{wandb_run.id}", verbose=2),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=2, warn=True,
-                     eval_freq=10000, deterministic=True, verbose=2,
+                     eval_freq=1000, deterministic=True, verbose=2,
                      callback_after_eval=AcceptanceRatioCallback(
+                         env=eval_env,
                          name="Eval acceptance ratio",
+                         steps_per_tr_phase=1,  # must be 1 for eval (default value)
                          verbose=2
                      ))
     ]
 
     # model training
     model.learn(total_timesteps=tot_tr_steps,
-                log_interval=100,
+                log_interval=20,
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    # wandb_run.finish()
+    wandb_run.finish()
 
-    # obs = env.reset()
-    # while True:
+    # obs = tr_env.reset()
+    # for i in range(1000):
     #     action, _states = model.predict(obs)
-    #     print(action)
-    #     obs, rewards, done, info = env.step(action)
+    #     obs, rewards, done, info = tr_env.step(action)
     #     if done:
-    #         env.reset()
-    # env.render()
+    #         obs = tr_env.reset()
+    # # env.render()

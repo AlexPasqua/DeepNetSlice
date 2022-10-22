@@ -46,7 +46,7 @@ class NetworkSimulator(gym.Env):
         self._cur_vl_reqBW = 0  # auxiliary attribute needed in method 'self.compute_link_weight'
         self.time_step = 0  # keep track of current time step
         self.ep_number = 0  # keep track of current episode number
-        self.tot_nsprs = 0  # keep track of the number of NSPRs seen so far
+        self.tot_seen_nsprs = 0  # keep track of the number of NSPRs seen so far
         self.accepted_nsprs = 0  # for the overall acceptance ratio
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
@@ -153,7 +153,7 @@ class NetworkSimulator(gym.Env):
             self.cur_nspr = self.waiting_nsprs.pop(0)
             self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
             self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
-            self.tot_nsprs += 1
+            # self.tot_seen_nsprs += 1
             _ = self.update_nspr_state()    # _obs_dict updated withing method
 
     def check_for_departed_nsprs(self):
@@ -190,6 +190,7 @@ class NetworkSimulator(gym.Env):
         self.reset_partial_rewards()
         self.cur_nspr = None
         self.nsprs_seen_in_cur_ep += 1
+        self.tot_seen_nsprs += 1
         if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
             self.done = True
         self.pick_next_nspr()
@@ -491,6 +492,7 @@ class NetworkSimulator(gym.Env):
             else:
                 # it means we finished the VNFs of the current NSPR
                 self.nsprs_seen_in_cur_ep += 1
+                self.tot_seen_nsprs += 1
                 if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
                     self.done = True
                 # update global reward because the NSPR is fully placed
