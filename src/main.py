@@ -72,7 +72,7 @@ if __name__ == '__main__':
                 gamma=0.8,
                 ent_coef=0.001,
                 use_rms_prop=True,
-                tensorboard_log="../tb_logs_new_eval_rew_test/",
+                # tensorboard_log="../tb_logs_new_eval_rew_test/",
                 policy_kwargs=dict(
                     psn=psn,
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
@@ -91,15 +91,15 @@ if __name__ == '__main__':
         "policy_type": policy,
         "total_timesteps": tot_tr_steps,
     }
-    wandb_run = wandb.init(
-        project="New eval rew test",
-        dir="../",
-        name="Simpler HADRL-style PSN - branch main",
-        config=config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        # monitor_gym=True,  # auto-upload the videos of agents playing the game
-        # save_code=True,  # optional
-    )
+    # wandb_run = wandb.init(
+    #     project="New eval rew test",
+    #     dir="../",
+    #     name="Simpler HADRL-style PSN - branch main",
+    #     config=config,
+    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    #     # monitor_gym=True,  # auto-upload the videos of agents playing the game
+    #     # save_code=True,  # optional
+    # )
 
     # training callbacks
     list_of_callbacks = [
@@ -113,7 +113,7 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        WandbCallback(model_save_path=f"../models_prova/{wandb_run.id}", verbose=2),
+        # WandbCallback(model_save_path=f"../models_prova/{wandb_run.id}", verbose=2),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=2, warn=True,
                      eval_freq=100, deterministic=True, verbose=2,

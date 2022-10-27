@@ -74,11 +74,14 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             observation_space, psn, th.relu, gcn_layers_dims,
             nspr_out_features
         )
+        self.policy_features_dim = self.policy_features_extractor.features_dim
+        self.value_features_dim = self.value_features_extractor.features_dim
         delattr(self, "features_extractor")  # remove the shared features extractor
+        delattr(self, "features_dim")   # remove features_dim coming form shared features extractor
 
         # TODO: check what this step actually does
         # Disable orthogonal initialization
-        self.ortho_init = False
+        # self.ortho_init = False
 
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = HADRLActorCriticNet(
