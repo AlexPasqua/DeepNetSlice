@@ -1,11 +1,14 @@
+from functools import partial
 from typing import Callable, Dict, List, Optional, Type, Union, Tuple
 
 import gym
 import networkx as nx
+import numpy as np
 import torch as th
 from stable_baselines3.common.distributions import Distribution
 from stable_baselines3.common.policies import MultiInputActorCriticPolicy
 from stable_baselines3.common.preprocessing import preprocess_obs
+from stable_baselines3.common.type_aliases import Schedule
 from torch import nn
 
 from .features_extractors import HADRLFeaturesExtractor
@@ -46,10 +49,12 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         :param use_heuristic: Whether to use the heuristic or not
         :param heu_kwargs: Keyword arguments for the heuristic
         """
+
+        assert len(net_arch) == 1 and isinstance(net_arch[0], dict), \
+            "This policy allows net_arch to be a list with only one dict"
+
         self.psn = psn
         self.gcn_layers_dims = gcn_layers_dims  # saved in an attribute for logging purposes
-        self.gcn_out_channels = gcn_layers_dims[-1]
-        self.nspr_out_features = nspr_out_features
         self.servers_map_idx_id = servers_map_idx_id
         self.use_heuristic = use_heuristic
         self.heu_kwargs = heu_kwargs
@@ -64,7 +69,6 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             *args,
             **kwargs,
         )
-
         # non-shared features extractors for the actor and the critic
         self.policy_features_extractor = HADRLFeaturesExtractor(
             observation_space, psn, th.tanh, gcn_layers_dims,
@@ -74,20 +78,69 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             observation_space, psn, th.relu, gcn_layers_dims,
             nspr_out_features
         )
-        self.policy_features_dim = self.policy_features_extractor.features_dim
-        self.value_features_dim = self.value_features_extractor.features_dim
+        self.features_dim = {'pi': self.policy_features_extractor.features_dim,
+                             'vf': self.value_features_extractor.features_dim}
         delattr(self, "features_extractor")  # remove the shared features extractor
-        delattr(self, "features_dim")   # remove features_dim coming form shared features extractor
 
         # TODO: check what this step actually does
         # Disable orthogonal initialization
         # self.ortho_init = False
 
+        # Workaround alert!
+        # This method is called in the super-constructor. It creates the optimizer,
+        # but using also the params of the features extractor before creating
+        # our own 2 separate ones ('policy_features_extractor' and
+        # 'value_features_extractor'). Therefore we need to re-create the optimizer
+        # using the params of the correct new features extractor.
+        # (it will also re-do a bunch of things like re-creating the mlp_extractor,
+        # which was fine, but it's not a problem).
+        self._rebuild(lr_schedule)
+
+    def _rebuild(self, lr_schedule: Schedule) -> None:
+        """
+        Like method _build, but needed to be re-called to re-create the
+        optimizer, since it was created using obsolete parameters, i.e. params
+        including the ones of the default shared features extractor and NOT
+        including the ones of the new features extractors.
+        The mlp_extractor is recreated too, since it was created with incorrect features_dim.
+
+        :param lr_schedule: Learning rate schedule
+            lr_schedule(1) is the initial learning rate
+        """
+        self._build_mlp_extractor()
+
+        # action_net and value_net as created in the '_build' method are OK,
+        # no need to recreate them.
+
+        # Init weights: use orthogonal initialization
+        # with small initial weight for the output
+        if self.ortho_init:
+            # TODO: check for features_extractor
+            # Values from stable-baselines.
+            # features_extractor/mlp values are
+            # originally from openai/baselines (default gains/init_scales).
+            module_gains = {
+                self.policy_features_extractor: np.sqrt(2),
+                self.value_features_extractor: np.sqrt(2),
+                self.mlp_extractor: np.sqrt(2),
+                self.action_net: 0.01,
+                self.value_net: 1,
+            }
+            for module, gain in module_gains.items():
+                module.apply(partial(self.init_weights, gain=gain))
+
+        # Setup optimizer with initial learning rate
+        self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
+
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = HADRLActorCriticNet(
-            self.action_space, self.psn, self.servers_map_idx_id,
-            self.features_dim, self.gcn_out_channels, self.nspr_out_features,
-            self.use_heuristic, self.heu_kwargs
+            action_space=self.action_space,
+            psn=self.psn,
+            net_arch=self.net_arch,
+            servers_map_idx_id=self.servers_map_idx_id,
+            features_dim=self.features_dim,
+            use_heuristic=self.use_heuristic,
+            heu_kwargs=self.heu_kwargs
         )
 
     def extract_features(self, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:

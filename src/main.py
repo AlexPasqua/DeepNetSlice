@@ -75,6 +75,7 @@ if __name__ == '__main__':
                 # tensorboard_log="../tb_logs_new_eval_rew_test/",
                 policy_kwargs=dict(
                     psn=psn,
+                    net_arch=[dict(pi=[128, 64, 32], vf=[128, 64, 32, 16])],
                     servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
                     gcn_layers_dims=(60, 60, 60, 40, 20),
                     use_heuristic=use_heuristic,
