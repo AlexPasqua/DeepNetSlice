@@ -1,4 +1,7 @@
-import torch as th
+from statistics import mean
+
+import gym
+import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import HParam
 
@@ -8,11 +11,24 @@ class AcceptanceRatioCallback(BaseCallback):
     A custom callback that derives from ``BaseCallback``.
     It logs the acceptance ratio on Tensorboard.
 
+    :param name: name of the metric to log
+    :param steps_per_tr_phase: number of steps that define a training phase.
+        The acceptance ratio is logged once per training phase.
     :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
     """
-    def __init__(self, name: str = "Acceptance ratio", verbose=0):
+    def __init__(
+            self,
+            env: gym.Env,
+            name: str = "Acceptance ratio",
+            steps_per_tr_phase: int = 1,
+            verbose=0
+    ):
         super(AcceptanceRatioCallback, self).__init__(verbose)
+        self.env = env
         self.name = name
+        self.steps_per_tr_phase = steps_per_tr_phase
+        self.tot_to_subtract = None
+        self.accepted_to_subtract = None
         # Those variables will be accessible in the callback
         # (they are defined in the base class)
         # The RL model
@@ -40,17 +56,22 @@ class AcceptanceRatioCallback(BaseCallback):
 
         :return: (bool) If the callback returns False, training is aborted early.
         """
-        list_of_totals = self.training_env.get_attr("tot_nsprs")
-        list_of_accepted = self.training_env.get_attr("accepted_nsprs")
-        local_accept_ratios = []
-        for i, tot in enumerate(list_of_totals):
-            if tot > 0:
-                cur_accept_ratio = list_of_accepted[i] / tot
-                local_accept_ratios.append(cur_accept_ratio)
-        n_ratios = len(local_accept_ratios)
-        if n_ratios > 0:
-            overall_accept_ratio = sum(local_accept_ratios) / n_ratios
+        accepted_nsprs_per_env = np.array(self.env.get_attr("accepted_nsprs"), dtype=np.float32)
+        tot_nsprs_per_env = np.array(self.env.get_attr("tot_seen_nsprs"), dtype=np.float32)
+        if self.tot_to_subtract is None:    # or self.accepted_to_subtract is None, either way
+            self.tot_to_subtract = np.zeros_like(tot_nsprs_per_env)
+            self.accepted_to_subtract = np.zeros_like(accepted_nsprs_per_env)
+        accepted_nsprs_per_env -= self.accepted_to_subtract
+        tot_nsprs_per_env -= self.tot_to_subtract
+        if self.n_calls % self.steps_per_tr_phase == 0:
+            accept_ratio_per_env = np.divide(accepted_nsprs_per_env,
+                                             tot_nsprs_per_env,
+                                             out=np.zeros_like(tot_nsprs_per_env),
+                                             where=tot_nsprs_per_env != 0)
+            overall_accept_ratio = np.mean(accept_ratio_per_env)
             self.logger.record(self.name, overall_accept_ratio)
+            self.tot_to_subtract = tot_nsprs_per_env
+            self.accepted_to_subtract = accepted_nsprs_per_env
         return True
 
 
