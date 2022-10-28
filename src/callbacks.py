@@ -56,14 +56,14 @@ class AcceptanceRatioCallback(BaseCallback):
 
         :return: (bool) If the callback returns False, training is aborted early.
         """
-        accepted_nsprs_per_env = np.array(self.env.get_attr("accepted_nsprs"), dtype=np.float32)
-        tot_nsprs_per_env = np.array(self.env.get_attr("tot_seen_nsprs"), dtype=np.float32)
-        if self.tot_to_subtract is None:    # or self.accepted_to_subtract is None, either way
-            self.tot_to_subtract = np.zeros_like(tot_nsprs_per_env)
-            self.accepted_to_subtract = np.zeros_like(accepted_nsprs_per_env)
-        accepted_nsprs_per_env -= self.accepted_to_subtract
-        tot_nsprs_per_env -= self.tot_to_subtract
         if self.n_calls % self.steps_per_tr_phase == 0:
+            accepted_nsprs_per_env = np.array(self.env.get_attr("accepted_nsprs"), dtype=np.float32)
+            tot_nsprs_per_env = np.array(self.env.get_attr("tot_seen_nsprs"), dtype=np.float32)
+            if self.tot_to_subtract is None:    # or self.accepted_to_subtract is None, either way
+                self.tot_to_subtract = np.zeros_like(tot_nsprs_per_env)
+                self.accepted_to_subtract = np.zeros_like(accepted_nsprs_per_env)
+            accepted_nsprs_per_env -= self.accepted_to_subtract
+            tot_nsprs_per_env -= self.tot_to_subtract
             accept_ratio_per_env = np.divide(accepted_nsprs_per_env,
                                              tot_nsprs_per_env,
                                              out=np.zeros_like(tot_nsprs_per_env),
@@ -126,7 +126,7 @@ class HParamCallback(BaseCallback):
             "NSPRs per eval episode": self.eval_nsprs_per_ep,
             "PSN load (eval)": self.eval_psn_load,
             "max steps per eval episode": self.eval_max_ep_steps,
-            "GCN layers dimensions": str(self.model.policy.gcn_layers_dims),
+            # "GCN layers dimensions": str(self.model.policy.gcn_layers_dims),
             "Use heuristic": self.use_heuristic,
             "Heuristic class": self.heu_class,
             "heu's num sampled servers": self.heu_kwargs.get("n_servers_to_sample", None),
