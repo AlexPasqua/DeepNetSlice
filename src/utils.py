@@ -35,8 +35,9 @@ def make_env(
     time_limit_kwargs = {} if time_limit_kwargs is None else time_limit_kwargs
     reset_with_rand_load_kwargs = {} if reset_with_rand_load_kwargs is None else reset_with_rand_load_kwargs
 
-    env = NetworkSimulator(psn_file=psn_path,
-        **base_env_kwargs
+    env = NetworkSimulator(
+        psn_file=psn_path,
+        **base_env_kwargs,
         # nsprs_path='../NSPRs/',
         # nsprs_per_episode=50,
         # nsprs_max_duration=30,

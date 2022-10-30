@@ -11,6 +11,7 @@ from torch import nn
 
 class P2CLoadBalanceHeuristic(nn.Module):
     """ Layer executing the P2C heuristic """
+    name = "P2C load balance heuristic"
 
     def __init__(
             self,

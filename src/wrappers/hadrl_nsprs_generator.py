@@ -1,8 +1,6 @@
 import copy
-import random
+import math
 import warnings
-from collections import Counter
-from typing import Tuple, Union, List
 
 import gym
 import networkx as nx
@@ -32,6 +30,9 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
             warnings.warn("The environment already has a fixed number of NSPRs"
                           "per episode. The wrapper will override this value.")
         self.unwrapped.nsprs_per_episode = nsprs_per_ep
+        if nsprs_per_ep is None:
+            # no limit, just use max steps (if not None), otherwise infinite episode
+            nsprs_per_ep = math.inf
         self.nsprs_per_ep = nsprs_per_ep
         self.vnfs_per_nspr = vnfs_per_nspr
         self.cpu_req_per_vnf = cpu_req_per_vnf

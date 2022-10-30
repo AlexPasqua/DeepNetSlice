@@ -133,5 +133,5 @@ dmypy.json
 
 # project-specific stuff
 tb_logs*/
-models/
+models*/
 wandb/

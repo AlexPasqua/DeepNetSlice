@@ -20,6 +20,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
 
     [1] https://ieeexplore.ieee.org/document/9632824
     """
+    name = 'HADRL Policy'
+
     def __init__(
             self,
             observation_space: gym.spaces.Space,
