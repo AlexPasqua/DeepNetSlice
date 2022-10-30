@@ -108,7 +108,7 @@ def create_HADRL_PSN_file(
     g = nx.Graph(Label="HA-DRL PSN")
 
     # add nodes
-    _create_HADRL_nodes(g, CCP_ids, CDC_ids, EDC_ids, routers_ids, switches_ids,
+    _create_HADRL_nodes(g, CCP_ids, CDC_ids, EDC_ids, switches_ids, routers_ids,
                         cpu_cap, ram_cap)
 
     # add links
