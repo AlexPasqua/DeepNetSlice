@@ -24,7 +24,7 @@ if __name__ == '__main__':
     psn = reader.read_psn(psn_path)
 
     # training environment
-    n_tr_envs = 4
+    n_tr_envs = 8
     tr_nsprs_per_ep = None
     tr_load = 0.5
     tr_time_limit = True
@@ -45,9 +45,9 @@ if __name__ == '__main__':
 
     # evaluation environment
     n_eval_envs = 1
-    eval_time_limit = False
     eval_nsprs_per_ep = 100
     eval_load = 0.5
+    eval_time_limit = False
     eval_max_ep_steps = 1000
     eval_env = make_vec_env(
         env_id=make_env,
@@ -82,7 +82,7 @@ if __name__ == '__main__':
                 ent_coef=0.001,
                 max_grad_norm=0.9,
                 use_rms_prop=True,
-                tensorboard_log="../tb_logs_big-test/",
+                # tensorboard_log="../tb_logs_big-test/",
                 policy_kwargs=policy_kwargs)
 
     print(model.policy)
@@ -107,14 +107,14 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    wandb_run = wandb.init(
-        project="Big test",
-        dir="../",
-        # name="Simpler HADRL-style PSN - branch main",
-        config=config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        save_code=True,  # optional
-    )
+    # wandb_run = wandb.init(
+    #     project="Big test",
+    #     dir="../",
+    #     # name="Simpler HADRL-style PSN - branch main",
+    #     config=config,
+    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    #     save_code=True,  # optional
+    # )
 
     # training callbacks
     list_of_callbacks = [
@@ -129,12 +129,12 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-                      verbose=2,
-                      model_save_freq=10_000),
+        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+        #               verbose=2,
+        #               model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1, warn=True,
-                     eval_freq=10_000, deterministic=True, verbose=2,
+                     eval_freq=500, deterministic=True, verbose=2,
                      callback_after_eval=AcceptanceRatioCallback(
                          env=eval_env,
                          name="Eval acceptance ratio",

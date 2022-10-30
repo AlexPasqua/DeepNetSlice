@@ -193,6 +193,7 @@ class NetworkSimulator(gym.Env):
         self.tot_seen_nsprs += 1
         if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
             self.done = True
+        self.waiting_nsprs += self.nsprs.get(self.time_step, [])
         self.pick_next_nspr()
         obs = self.update_nspr_state()
         reward = self.rval_rejected_vnf
@@ -395,10 +396,6 @@ class NetworkSimulator(gym.Env):
         #     obs, reward = self.manage_unsuccessful_action()
         #     return obs, reward, done, info
 
-        self.check_for_departed_nsprs()
-        self.waiting_nsprs += self.nsprs.get(self.time_step, [])
-        self.pick_next_nspr()
-
         # place the VNF and update the resources availabilities of the physical node
         if self.cur_nspr is not None:
             physical_node_id = self.servers_map_idx_id[action]
@@ -505,6 +502,11 @@ class NetworkSimulator(gym.Env):
                 self.cur_nspr = None    # marked as None so a new one can be picked
                 # update the acceptance ratio
                 self.accepted_nsprs += 1
+
+        # check for new and departing NSPRs
+        self.check_for_departed_nsprs()
+        self.waiting_nsprs += self.nsprs.get(self.time_step, [])
+        self.pick_next_nspr()
 
         # new observation
         obs = self.update_nspr_state()
