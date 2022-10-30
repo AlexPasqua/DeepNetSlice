@@ -47,7 +47,7 @@ if __name__ == '__main__':
     n_eval_envs = 1
     eval_nsprs_per_ep = 100
     eval_load = 0.5
-    eval_time_limit = False
+    eval_time_limit = True
     eval_max_ep_steps = 1000
     eval_env = make_vec_env(
         env_id=make_env,
