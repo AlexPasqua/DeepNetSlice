@@ -96,6 +96,10 @@ class NetworkSimulator(gym.Env):
     def cur_vnf(self):
         return self.cur_nspr.nodes[self.cur_vnf_id] if self.cur_nspr is not None else None
 
+    @property
+    def obs_dict(self):
+        return self._obs_dict
+
     def reset_partial_rewards(self):
         """ Resets the partial rewards (used in case a NSPR cannot be placed) """
         self._acceptance_rewards = []

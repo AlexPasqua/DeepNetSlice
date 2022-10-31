@@ -5,7 +5,7 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 import reader
-from callbacks import AcceptanceRatioCallback, HParamCallback
+from callbacks import AcceptanceRatioCallback, HParamCallback, CPULoadCallback
 from heuristic_layers import HADRLHeuristic, P2CLoadBalanceHeuristic
 from policies.hadrl_policy import HADRLPolicy
 from utils import make_env, create_HADRL_PSN_file
@@ -140,7 +140,11 @@ if __name__ == '__main__':
                          name="Eval acceptance ratio",
                          steps_per_tr_phase=1,  # must be 1 for eval (default value)
                          verbose=2
-                     ))
+                     )),
+
+        # NOTE: currently it works only if all the servers have the same max CPU cap
+        # (routers & switches, that have no CPU, are not a problem)
+        CPULoadCallback(env=tr_env, freq=100),
     ]
 
     # model training
