@@ -5,7 +5,6 @@ from typing import Union, Tuple
 import gym
 import networkx as nx
 import numpy as np
-import torch as th
 
 import reader
 
@@ -151,6 +150,7 @@ class NetworkSimulator(gym.Env):
         """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
         if self.cur_nspr is None and self.waiting_nsprs:
             self.cur_nspr = self.waiting_nsprs.pop(0)
+            self.cur_nspr.graph['DepartureTime'] = self.time_step + self.cur_nspr.graph['duration']
             self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
             self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
             # self.tot_seen_nsprs += 1
@@ -167,14 +167,16 @@ class NetworkSimulator(gym.Env):
             cur_nsprs = self.nsprs[arrival_time]
             for nspr in cur_nsprs:
                 departed = nspr.graph.get('departed', False)
-                if nspr.graph['DepartureTime'] < self.time_step and not departed:
+                if nspr.graph.get('DepartureTime', self.time_step) < self.time_step and not departed:
                     self.restore_avail_resources(nspr=nspr)
-                    if nspr == self.cur_nspr:
-                        # haven't finished placing this NSPR, but its departure time has come.
-                        # remove NSPR, no reward, neither positive nor negative
-                        # (not agent's fault, too many requests at the same time)
-                        self.cur_nspr = None
-                        self.reset_partial_rewards()
+
+                    # This should be useless now
+                    # if nspr == self.cur_nspr:
+                    #     # haven't finished placing this NSPR, but its departure time has come.
+                    #     # remove NSPR, no reward, neither positive nor negative
+                    #     # (not agent's fault, too many requests at the same time)
+                    #     self.cur_nspr = None
+                    #     self.reset_partial_rewards()
 
     def manage_unsuccessful_action(self) -> Tuple[GymObs, int]:
         """ Method to manage an unsuccessful action, executed when a VNF/VL cannot be placed onto the PSN.
@@ -190,6 +192,7 @@ class NetworkSimulator(gym.Env):
         self.reset_partial_rewards()
         self.cur_nspr = None
         self.nsprs_seen_in_cur_ep += 1
+
         self.tot_seen_nsprs += 1
         if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
             self.done = True

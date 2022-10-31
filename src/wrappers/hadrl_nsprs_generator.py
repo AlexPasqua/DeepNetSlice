@@ -85,7 +85,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
             if poisson_sample > 0:
                 cur_nspr = copy.deepcopy(self.nspr_model)
                 cur_nspr.graph['ArrivalTime'] = cur_arr_time
-                cur_nspr.graph['DepartureTime'] = cur_arr_time + self.nsprs_duration
+                cur_nspr.graph['duration'] = self.nsprs_duration
                 nsprs_to_create = min(poisson_sample, self.nsprs_per_ep - created_nsprs)
                 if nsprs_to_create <= 0:
                     break
@@ -113,7 +113,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
                 if step % one_every_how_many_steps == 0:
                     cur_nspr = copy.deepcopy(self.nspr_model)
                     cur_nspr.graph['ArrivalTime'] = step
-                    cur_nspr.graph['DepartureTime'] = step + self.nsprs_duration
+                    cur_nspr.graph['duration'] = self.nsprs_duration
                     nsprs_dict[step] = [cur_nspr]
                     created_nsprs += 1
                     # if step % one_every_how_many_steps == 0 and \

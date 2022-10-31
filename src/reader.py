@@ -217,6 +217,6 @@ def sample_nsprs(nsprs_path: str, n: int, min_arrival_time: int = 0,
     for i, arr_time in enumerate(arrival_times):
         nspr = read_single_nspr(os.path.join(nsprs_path, sampled_nsprs_files[i]))
         nspr.graph['ArrivalTime'] = arr_time
-        nspr.graph['DepartureTime'] = arr_time + random.randint(len(nspr.nodes), max_duration)
+        nspr.graph['duration'] = random.randint(len(nspr.nodes), max_duration)
         nspr_dict[arr_time] = nspr_dict.get(arr_time, []) + [nspr]
     return nspr_dict

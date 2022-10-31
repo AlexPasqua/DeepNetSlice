@@ -13,13 +13,13 @@ from utils import make_env, create_HADRL_PSN_file
 if __name__ == '__main__':
     psn_path = '../PSNs/corrected_hadrl_psn.graphml'
 
-    create_HADRL_PSN_file(
-        path=psn_path,
-        # n_CDCs=2,
-        # n_EDCs=6,
-        # n_servers_per_DC=(5, 3, 2),
-        # n_EDCs_per_CDC=3
-    )
+    # create_HADRL_PSN_file(
+    #     path=psn_path,
+    #     # n_CDCs=2,
+    #     # n_EDCs=6,
+    #     # n_servers_per_DC=(5, 3, 2),
+    #     # n_EDCs_per_CDC=3
+    # )
 
     psn = reader.read_psn(psn_path)
 
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     n_eval_envs = 1
     eval_nsprs_per_ep = 100
     eval_load = 0.5
-    eval_time_limit = True
+    eval_time_limit = False
     eval_max_ep_steps = 1000
     eval_env = make_vec_env(
         env_id=make_env,
@@ -150,11 +150,3 @@ if __name__ == '__main__':
                 callback=list_of_callbacks)
 
     # wandb_run.finish()
-
-    # obs = tr_env.reset()
-    # for i in range(1000):
-    #     action, _states = model.predict(obs)
-    #     obs, rewards, done, info = tr_env.step(action)
-    #     if done:
-    #         obs = tr_env.reset()
-    # # env.render()
