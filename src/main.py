@@ -5,7 +5,9 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 import reader
-from callbacks import AcceptanceRatioCallback, HParamCallback, CPULoadCallback
+from callbacks import CPULoadCallback
+from callbacks import HParamCallback
+from callbacks import AcceptanceRatioCallback
 from heuristic_layers import HADRLHeuristic, P2CLoadBalanceHeuristic
 from policies.hadrl_policy import HADRLPolicy
 from utils import make_env, create_HADRL_PSN_file
