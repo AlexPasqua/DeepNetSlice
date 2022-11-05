@@ -7,7 +7,9 @@ from wandb.integration.sb3 import WandbCallback
 import reader
 from callbacks import CPULoadCallback
 from callbacks import HParamCallback
-from callbacks import AcceptanceRatioCallback
+from callbacks import AcceptanceRatioByStepsCallback
+from callbacks.acceptance_ratio_callbacks import AcceptanceRatioByNSPRsCallback
+from environments.network_simulator import NetworkSimulator
 from heuristic_layers import HADRLHeuristic, P2CLoadBalanceHeuristic
 from policies.hadrl_policy import HADRLPolicy
 from utils import make_env, create_HADRL_PSN_file
@@ -26,7 +28,7 @@ if __name__ == '__main__':
     psn = reader.read_psn(psn_path)
 
     # training environment
-    n_tr_envs = 8
+    n_tr_envs = 1
     tr_nsprs_per_ep = None
     tr_load = 0.5
     tr_time_limit = True
@@ -47,9 +49,9 @@ if __name__ == '__main__':
 
     # evaluation environment
     n_eval_envs = 1
-    eval_nsprs_per_ep = 100
+    eval_nsprs_per_ep = None
     eval_load = 0.5
-    eval_time_limit = False
+    eval_time_limit = True
     eval_max_ep_steps = 1000
     eval_env = make_vec_env(
         env_id=make_env,
@@ -84,7 +86,7 @@ if __name__ == '__main__':
                 ent_coef=0.001,
                 max_grad_norm=0.9,
                 use_rms_prop=True,
-                # tensorboard_log="../tb_logs_big-test/",
+                tensorboard_log="../tb_logs_accept-ratio-nsprs/",
                 policy_kwargs=policy_kwargs)
 
     print(model.policy)
@@ -109,19 +111,22 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    # wandb_run = wandb.init(
-    #     project="Big test",
-    #     dir="../",
-    #     # name="Simpler HADRL-style PSN - branch main",
-    #     config=config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     save_code=True,  # optional
-    # )
+    wandb_run = wandb.init(
+        project="Acceptance ratio by NSPRs",
+        dir="../",
+        # name="Simpler HADRL-style PSN - branch main",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        save_code=True,  # optional
+    )
 
     # training callbacks
     list_of_callbacks = [
-        AcceptanceRatioCallback(env=tr_env, name="Acceptance ratio",
-                                steps_per_tr_phase=1000, verbose=2),
+        # AcceptanceRatioByStepsCallback(env=tr_env, name="Acceptance ratio (by steps)",
+        #                                steps_per_tr_phase=1000, verbose=2),
+
+        AcceptanceRatioByNSPRsCallback(env=tr_env, name="Train acceptance ratio (by NSPRs)",
+                                       nsprs_per_tr_phase=100, verbose=2),
 
         HParamCallback(tr_env.num_envs, eval_env.num_envs, tr_nsprs_per_ep,
                        tr_load,
@@ -131,28 +136,28 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-        #               verbose=2,
-        #               model_save_freq=10_000),
+        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+                      verbose=2,
+                      model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1, warn=True,
-                     eval_freq=500, deterministic=True, verbose=2,
-                     callback_after_eval=AcceptanceRatioCallback(
+                     eval_freq=5_000, deterministic=False, verbose=2,
+                     callback_after_eval=AcceptanceRatioByNSPRsCallback(
                          env=eval_env,
-                         name="Eval acceptance ratio",
-                         steps_per_tr_phase=1,  # must be 1 for eval (default value)
+                         name="Eval acceptance ratio (by NSPRs)",
+                         nsprs_per_tr_phase=1,  # must be 1 for eval (default value)
                          verbose=2
                      )),
 
         # NOTE: currently it works only if all the servers have the same max CPU cap
         # (routers & switches, that have no CPU, are not a problem)
-        CPULoadCallback(env=tr_env, freq=100),
+        CPULoadCallback(env=tr_env, freq=200),
     ]
 
     # model training
     model.learn(total_timesteps=tot_tr_steps,
-                log_interval=1,
+                log_interval=4,
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    # wandb_run.finish()
+    wandb_run.finish()

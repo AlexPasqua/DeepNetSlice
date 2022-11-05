@@ -1,9 +1,12 @@
+import warnings
+
 import gym
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import VecEnv
 
 
-class AcceptanceRatioCallback(BaseCallback):
+class AcceptanceRatioByStepsCallback(BaseCallback):
     """
     A custom callback that derives from ``BaseCallback``.
     It logs the acceptance ratio on Tensorboard.
@@ -21,7 +24,7 @@ class AcceptanceRatioCallback(BaseCallback):
             steps_per_tr_phase: int = 1,
             verbose=0
     ):
-        super(AcceptanceRatioCallback, self).__init__(verbose)
+        super(AcceptanceRatioByStepsCallback, self).__init__(verbose)
         self.env = env
         self.name = name
         self.steps_per_tr_phase = steps_per_tr_phase
@@ -70,4 +73,60 @@ class AcceptanceRatioCallback(BaseCallback):
             self.logger.record(self.name, overall_accept_ratio)
             self.tot_to_subtract = tot_nsprs_per_env
             self.accepted_to_subtract = accepted_nsprs_per_env
+        return True
+
+
+class AcceptanceRatioByNSPRsCallback(BaseCallback):
+    """
+   A custom callback that derives from ``BaseCallback``.
+   It logs the acceptance ratio on Tensorboard.
+
+   Note: it works only with non-vectorized environment or with a vectorized one
+   containing only 1 environment.
+
+   :param env: environment
+   :param name: name of the metric to log
+   :param nsprs_per_tr_phase: number of NSPRs that define a training phase.
+       The acceptance ratio is logged once per training phase.
+   :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
+   """
+    def __init__(
+            self,
+            env: gym.Env,
+            name: str = "Acceptance ratio",
+            nsprs_per_tr_phase: int = 1,
+            verbose=0
+    ):
+        super().__init__(verbose)
+        self.env = env
+        self.name = name
+        self.nsprs_per_tr_phase = nsprs_per_tr_phase
+        self.seen_to_subtract = 0
+        self.accepted_to_subtract = 0
+        self.last_seen = 0
+        if isinstance(self.env, VecEnv) and self.env.num_envs > 1:
+            warnings.warn("The env is vectorized, only the first env instance "
+                          "will be used for the acceptance ratio by NSPRs.")
+
+    def _on_step(self) -> bool:
+        if isinstance(self.env, VecEnv):
+            seen_nsprs = self.env.get_attr('tot_seen_nsprs', 0)[0]
+            accepted_nsprs = self.env.get_attr('accepted_nsprs', 0)[0]
+        else:
+            seen_nsprs = self.env.tot_seen_nsprs
+            accepted_nsprs = self.env.accepted_nsprs
+        if seen_nsprs > self.last_seen and seen_nsprs % self.nsprs_per_tr_phase == 0:
+            self.last_seen = seen_nsprs
+            # NSPRs seen and accepted in this training phase
+            seen_this_tr_phase = seen_nsprs - self.seen_to_subtract
+            accepted_this_tr_phase = accepted_nsprs - self.accepted_to_subtract
+            # update how much to subtract to get the quantities for next tr phase
+            self.seen_to_subtract = seen_nsprs
+            self.accepted_to_subtract = accepted_nsprs
+            # compute acceptance ratio
+            try:
+                accept_ratio = accepted_this_tr_phase / seen_this_tr_phase
+            except ZeroDivisionError:
+                accept_ratio = 0.
+            self.logger.record(self.name, accept_ratio)
         return True
