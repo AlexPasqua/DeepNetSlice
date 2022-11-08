@@ -79,7 +79,7 @@ if __name__ == '__main__':
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs,)
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
                 learning_rate=0.001,
                 n_steps=10,  # ogni quanti step fare un update
                 gamma=0.99,

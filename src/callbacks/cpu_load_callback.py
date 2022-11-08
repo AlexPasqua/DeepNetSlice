@@ -23,8 +23,14 @@ class CPULoadCallback(BaseCallback):
         if self.n_calls % self.freq == 0:
             loads = []
             observations = self.env.get_attr('obs_dict')
-            for obs in observations:
-                loads.append(1. - np.mean(obs['cpu_avails']))
+            for e, obs in enumerate(observations):
+                servers_cpu_avails = []
+                for server_id in self.env.get_attr('servers_map_idx_id')[e].values():
+                    if self.env.get_attr('psn')[e].nodes[server_id]['NodeType'] == 'server':
+                        idx = self.env.get_attr('map_id_idx')[e][server_id]
+                        servers_cpu_avails.append(obs['cpu_avails'][idx])
+                avg_cpu_avail = np.mean(servers_cpu_avails)
+                loads.append(1. - avg_cpu_avail)
             avg_load = np.mean(loads)
             self.logger.record("Average CPU load of training envs", avg_load)
         return True
