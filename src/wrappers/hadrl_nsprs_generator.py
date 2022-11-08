@@ -49,7 +49,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
         except AttributeError or TypeError:
             self.nsprs_duration = 100
         # computed according to Sec. VII.C of HA-DRL paper
-        self.arr_rate = self.load * self.tot_cpu_cap / self.nsprs_duration / self.cpu_req_per_vnf
+        self.arr_rate = self.load * self.tot_cpu_cap / self.nsprs_duration / self.cpu_req_per_vnf / self.vnfs_per_nspr
 
     def reset(self, **kwargs):
         obs = self.env.reset(**kwargs)
@@ -125,7 +125,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
                 step += 1
                 # steps_without_correction += 1
                 if created_nsprs >= self.nsprs_per_ep or \
-                        (self.max_steps is not None and step > self.max_steps):
+                        (self.max_steps is not None and step - self.env.time_step > self.max_steps):
                     break
             return nsprs_dict
 

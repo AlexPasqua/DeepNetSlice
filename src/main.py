@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # training environment
     n_tr_envs = 1
     tr_nsprs_per_ep = None
-    tr_load = 0.5
+    tr_load = 0.1
     tr_time_limit = True
     tr_max_ep_steps = 1000
     tr_env = make_vec_env(
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     # evaluation environment
     n_eval_envs = 1
     eval_nsprs_per_ep = None
-    eval_load = 0.5
+    eval_load = 0.1
     eval_time_limit = True
     eval_max_ep_steps = 1000
     eval_env = make_vec_env(
@@ -79,14 +79,14 @@ if __name__ == '__main__':
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs,)
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
+    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
                 learning_rate=0.001,
                 n_steps=10,  # ogni quanti step fare un update
                 gamma=0.99,
                 ent_coef=0.001,
                 max_grad_norm=0.9,
                 use_rms_prop=True,
-                # tensorboard_log="../tb_logs_fixed-nsprs-generation/",
+                tensorboard_log="../tb_logs_fixed-nsprs-generation/",
                 policy_kwargs=policy_kwargs)
 
     print(model.policy)
@@ -111,14 +111,14 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    # wandb_run = wandb.init(
-    #     project="Fixed NSPR's generation",
-    #     dir="../",
-    #     # name="Simpler HADRL-style PSN - branch main",
-    #     config=config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     save_code=True,  # optional
-    # )
+    wandb_run = wandb.init(
+        project="Fixed NSPR's generation",
+        dir="../",
+        # name="Simpler HADRL-style PSN - branch main",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        save_code=True,  # optional
+    )
 
     # training callbacks
     list_of_callbacks = [
@@ -136,9 +136,9 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-        #               verbose=2,
-        #               model_save_freq=10_000),
+        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+                      verbose=2,
+                      model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1, warn=True,
                      eval_freq=5_000, deterministic=False, verbose=2,
@@ -160,4 +160,4 @@ if __name__ == '__main__':
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    # wandb_run.finish()
+    wandb_run.finish()
