@@ -92,7 +92,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
                 nsprs_dict[cur_arr_time] = [copy.deepcopy(cur_nspr) for _ in range(nsprs_to_create)]
                 created_nsprs += nsprs_to_create
             cur_arr_time += 1
-            if self.max_steps is not None and self.env.time_step + cur_arr_time > self.max_steps:
+            if self.max_steps is not None and cur_arr_time - self.env.time_step > self.max_steps:
                 break
         return nsprs_dict
 

@@ -7,7 +7,7 @@ from utils import make_env
 if __name__ == '__main__':
     # load model
     model = A2C.load(
-        path="../wandb/run-20221030_181949-2tqr4tfy/files/model.zip",
+        path="../wandb/run-20221105_170902-fb36esmi/files/model.zip",
         env=None,
         device='cuda:1',
         print_system_info=True,
@@ -19,12 +19,12 @@ if __name__ == '__main__':
         env_id=make_env,
         n_envs=1,
         env_kwargs=dict(
-            psn_path="../PSNs/corrected_hadrl_psn.graphml",
+            psn_path="../PSNs/hadrl_psn.graphml",
             time_limit=True,
-            time_limit_kwargs=dict(max_episode_steps=20*5*2),
+            time_limit_kwargs=dict(max_episode_steps=1000),
             reset_with_rand_load=False,
             hadrl_nsprs=True,
-            hadrl_nsprs_kwargs=dict(nsprs_per_ep=20,
+            hadrl_nsprs_kwargs=dict(nsprs_per_ep=None,
                                     load=0.5)
         ),
     )
@@ -33,10 +33,8 @@ if __name__ == '__main__':
     obs = env.reset()
     accepted = seen = 0.0
     accept_ratio_per_ep = []
-    for i in range(1000):
-        if i == 100:
-            print("hey")
-        action, _states = model.predict(obs, deterministic=False)
+    for i in range(10_000):
+        action, _states = model.predict(obs, deterministic=True)
         obs, rewards, done, info = env.step(action)
         # acceptance ratio
         if rewards[0] != 0.0:
@@ -45,7 +43,9 @@ if __name__ == '__main__':
                 accepted += 1
         if done:
             if seen != 0.:
-                accept_ratio_per_ep.append(accepted / seen)
+                cur_ep_accept_ratio = accepted / seen
+                accept_ratio_per_ep.append(cur_ep_accept_ratio)
+                print(f"Current episode's acceptance ratio: {cur_ep_accept_ratio}")
             accepted = seen = 0
             obs = env.reset()
 
