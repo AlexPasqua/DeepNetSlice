@@ -41,16 +41,16 @@ class HADRLActor(nn.Module):
         for i in range(len(dims) - 1):
             modules.append(nn.Linear(dims[i], dims[i + 1]))
             modules.append(nn.Tanh())
-        self.layers = nn.Sequential(*modules)
 
-        self.heuristic = heu_class(action_space, servers_map_idx_id, psn,
-                                   **heu_kwargs).requires_grad_(False)
+        if self.use_heuristic:
+            heu_layer = heu_class(action_space, servers_map_idx_id, psn,
+                                  **heu_kwargs).requires_grad_(False)
+            modules.append(heu_layer)
+
+        self.layers = nn.Sequential(*modules)
 
     def forward(self, x: th.Tensor, obs: th.Tensor) -> th.Tensor:
         x = self.layers(x)
-        if self.use_heuristic:
-            x = self.heuristic(x, obs)
-        # x = th.softmax(x, dim=1)
         return x
 
 

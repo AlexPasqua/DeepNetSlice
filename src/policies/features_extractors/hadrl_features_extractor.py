@@ -9,8 +9,6 @@ from torch import nn
 from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 
-device = th.device("cuda:1" if th.cuda.is_available() else "cpu")
-
 
 class HADRLFeaturesExtractor(BaseFeaturesExtractor):
     """
@@ -44,7 +42,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         edges = th.tensor(np.array(psn.edges).reshape((len(psn.edges), 2)),
                           dtype=th.long)
         double_edges = th.cat((edges, th.flip(edges, dims=(1,))))
-        self.edge_index = double_edges.t().contiguous().to(device)
+        self.edge_index = double_edges.t().contiguous()
 
         # GCN layers
         gcn_layers_dims = [nspr_out_features] + list(gcn_layers_dims)
@@ -56,26 +54,33 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
                               out_features=nspr_out_features)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
+        # save device (the one where the weights and observations are)
+        device = observations['cpu_avails'].device
+
+        # move edge_index to the correct device
+        self.edge_index = self.edge_index.to(device)
+
+        # save length of rollout buffer
         len_rollout_buffer = len(observations['cpu_avails'])
 
         # features extraction of the PSN state
         psn_state = th.empty(
             size=(len_rollout_buffer, self.n_nodes, self.n_features),
-            dtype=th.float)
+            dtype=th.float, device=device)
         psn_state[:, :, 0] = observations['cpu_avails']
         psn_state[:, :, 1] = observations['ram_avails']
         psn_state[:, :, 2] = observations['bw_avails']
         psn_state[:, :, 3] = observations['placement_state']
 
         # pass the psn_state through the GCN layers
-        gcn_out = psn_state.to(device)
+        gcn_out = psn_state
         for i in range(len(self.gcn_layers)):
             gcn_out = self.activation(self.gcn_layers[i](gcn_out, self.edge_index))
         gcn_out = gcn_out.flatten(start_dim=1)
 
         # features extraction of the NSPR state
         nspr_state = th.empty(size=(len_rollout_buffer, 1, self.n_features),
-                              dtype=th.float).to(device)
+                              dtype=th.float, device=device)
         nspr_state[:, :, 0] = observations['cur_vnf_cpu_req']
         nspr_state[:, :, 1] = observations['cur_vnf_ram_req']
         nspr_state[:, :, 2] = observations['cur_vnf_bw_req']
