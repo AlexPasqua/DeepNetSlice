@@ -7,9 +7,9 @@ from utils import make_env
 if __name__ == '__main__':
     # load model
     model = A2C.load(
-        path="../wandb/run-20221105_170902-fb36esmi/files/model.zip",
+        path="../wandb/run-20221109_094512-3tit0aki/files/model.zip",
         env=None,
-        device='cuda:1',
+        device='cuda:0',
         print_system_info=True,
         force_reset=True,   # True as default -> avoids unexpected behavior
     )

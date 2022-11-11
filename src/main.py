@@ -1,18 +1,18 @@
+import wandb
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
-import wandb
+from torch import nn
 from wandb.integration.sb3 import WandbCallback
 
 import reader
 from callbacks import CPULoadCallback
 from callbacks import HParamCallback
-from callbacks import AcceptanceRatioByStepsCallback
 from callbacks.acceptance_ratio_callbacks import AcceptanceRatioByNSPRsCallback
-from environments.network_simulator import NetworkSimulator
-from heuristic_layers import HADRLHeuristic, P2CLoadBalanceHeuristic
+from heuristic_layers import P2CLoadBalanceHeuristic
+from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
-from utils import make_env, create_HADRL_PSN_file
+from utils import make_env
 
 if __name__ == '__main__':
     psn_path = '../PSNs/hadrl_psn.graphml'
@@ -73,26 +73,46 @@ if __name__ == '__main__':
                   'eta': 0.05, 'xi': 1., 'beta': 1.}
     policy = HADRLPolicy
     policy_kwargs = dict(psn=psn,
-                         net_arch=[dict(pi=[256, 128], vf=[256, 128, 64])],
+                         # net_arch=[dict(pi=[256, 128], vf=[256, 128, 64])],
+                         net_arch=[256, 128, 64, dict(vf=[32])],
                          servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                         gcn_layers_dims=(60, 60, 60, 40, 20),
+                         gcn_layers_dims=(60, 50, 40, 20),
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs,)
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
-                learning_rate=0.001,
-                n_steps=10,  # ogni quanti step fare un update
-                gamma=0.99,
-                ent_coef=0.001,
+    # model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+    #             learning_rate=0.001,
+    #             n_steps=30,  # ogni quanti step fare un update
+    #             gamma=0.99,
+    #             ent_coef=0.001,
+    #             max_grad_norm=0.9,
+    #             use_rms_prop=True,
+    #             tensorboard_log="../tb_logs_fixed-nsprs-generation/",
+    #             policy_kwargs=policy_kwargs)
+
+    model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:1',
+                learning_rate=0.05,
+                n_steps=1000,  # ogni quanti step fare un update
+                gamma=0.95,
+                ent_coef=0.5,
                 max_grad_norm=0.9,
                 use_rms_prop=True,
                 tensorboard_log="../tb_logs_fixed-nsprs-generation/",
-                policy_kwargs=policy_kwargs)
+                policy_kwargs=dict(
+                    activation_fn=nn.Tanh,
+                    net_arch=[256, 128, dict(vf=[64, 32])],
+                    features_extractor_class=HADRLFeaturesExtractor,
+                    features_extractor_kwargs=dict(
+                        psn=psn,
+                        activation_fn=nn.Tanh,
+                        gcn_layers_dims=policy_kwargs['gcn_layers_dims'],
+                    )
+                ))
 
     print(model.policy)
 
     # define some training hyperparams
-    tot_tr_steps = 40_000_000
+    tot_tr_steps = 4_000_000
 
     # wandb stuff
     config = {
@@ -122,8 +142,8 @@ if __name__ == '__main__':
 
     # training callbacks
     list_of_callbacks = [
-        AcceptanceRatioByStepsCallback(env=tr_env, name="Acceptance ratio (by steps)",
-                                       steps_per_tr_phase=500, verbose=2),
+        # AcceptanceRatioByStepsCallback(env=tr_env, name="Acceptance ratio (by steps)",
+        #                                steps_per_tr_phase=500, verbose=2),
 
         AcceptanceRatioByNSPRsCallback(env=tr_env, name="Train acceptance ratio (by NSPRs)",
                                        nsprs_per_tr_phase=100, verbose=2),

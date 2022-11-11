@@ -39,6 +39,11 @@ class HParamCallback(BaseCallback):
             self.heu_class = None
 
     def _on_training_start(self) -> None:
+        try:
+            gcn_layers_dims = str(self.model.policy.features_extractor.gcn_layers_dims)
+        except AttributeError:
+            gcn_layers_dims = str(self.model.policy.gcn_layers_dims)
+
         hparam_dict = {
             "algorithm": self.model.__class__.__name__,
             "n training envs": self.n_tr_envs,
@@ -53,7 +58,7 @@ class HParamCallback(BaseCallback):
             "NSPRs per eval episode": self.eval_nsprs_per_ep,
             "PSN load (eval)": self.eval_psn_load,
             "max steps per eval episode": self.eval_max_ep_steps,
-            "GCN layers dimensions": str(self.model.policy.gcn_layers_dims),
+            "GCN layers dimensions": gcn_layers_dims,
             "Use heuristic": self.use_heuristic,
             "Heuristic class": self.heu_class,
             "heu's num sampled servers": self.heu_kwargs.get("n_servers_to_sample", None),

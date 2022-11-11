@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Type
 
 import gym
 import networkx as nx
@@ -20,7 +20,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
             self,
             observation_space: gym.Space,
             psn: nx.Graph,
-            activation_fn: th,
+            activation_fn: Type[nn.Module],
             gcn_layers_dims: Tuple[int],
             nspr_out_features: int = 4
     ):
@@ -35,6 +35,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         """
         self.activation = activation_fn
         self.n_nodes = len(psn.nodes)
+        self.gcn_layers_dims = gcn_layers_dims
         gcn_out_channels = gcn_layers_dims[-1]
         features_dim = gcn_out_channels * self.n_nodes + nspr_out_features
         super().__init__(observation_space, features_dim=features_dim)
@@ -75,7 +76,8 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         # pass the psn_state through the GCN layers
         gcn_out = psn_state
         for i in range(len(self.gcn_layers)):
-            gcn_out = self.activation(self.gcn_layers[i](gcn_out, self.edge_index))
+            gcn_out = self.gcn_layers[i](gcn_out, self.edge_index)
+            gcn_out = self.activation()(gcn_out)
         gcn_out = gcn_out.flatten(start_dim=1)
 
         # features extraction of the NSPR state
@@ -86,7 +88,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         nspr_state[:, :, 2] = observations['cur_vnf_bw_req']
         nspr_state[:, :, 3] = observations['vnfs_still_to_place']
         nspr_fc_out = self.nspr_fc(nspr_state.flatten(start_dim=1))
-        nspr_fc_out = self.activation(nspr_fc_out)
+        nspr_fc_out = self.activation()(nspr_fc_out)
 
         # concatenation of the two features vectors
         global_out = th.cat((gcn_out, nspr_fc_out), dim=1)
