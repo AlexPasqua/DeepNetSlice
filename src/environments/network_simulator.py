@@ -61,7 +61,7 @@ class NetworkSimulator(gym.Env):
         self._acceptance_rewards = []
         self._resource_consumption_rewards = []
         self._cur_resource_consumption_rewards = []
-        self._load_balancing_rewards = []
+        self._load_balance_rewards = []
 
         # reward values for specific outcomes
         self.rval_accepted_vnf = 100
@@ -90,21 +90,17 @@ class NetworkSimulator(gym.Env):
             'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
         })
         self._empty_psn_obs_dict = None     # used to store the observation resulting from an empty PSN
-        self._obs_dict = self._init_obs_dict()     # used to store the current observation
+        self.obs_dict = self._init_obs_dict()     # used to store the current observation
 
     @property
     def cur_vnf(self):
         return self.cur_nspr.nodes[self.cur_vnf_id] if self.cur_nspr is not None else None
 
-    @property
-    def obs_dict(self):
-        return self._obs_dict
-
     def reset_partial_rewards(self):
         """ Resets the partial rewards (used in case a NSPR cannot be placed) """
         self._acceptance_rewards = []
         self._resource_consumption_rewards = []
-        self._load_balancing_rewards = []
+        self._load_balance_rewards = []
 
     def enough_avail_resources(self, physical_node_id: int, vnf: dict) -> bool:
         """ Check that the physical node has enough resources to satisfy the VNF's requirements
@@ -114,8 +110,8 @@ class NetworkSimulator(gym.Env):
         :return: True if the physical node has enough resources to satisfy the VNF's requirements, False otherwise
         """
         idx = self.map_id_idx[physical_node_id]
-        enough_cpu = self._obs_dict['cpu_avails'][idx] >= vnf['reqCPU'] / self.max_cpu
-        enough_ram = self._obs_dict['ram_avails'][idx] >= vnf['reqRAM'] / self.max_ram
+        enough_cpu = self.obs_dict['cpu_avails'][idx] >= vnf['reqCPU'] / self.max_cpu
+        enough_ram = self.obs_dict['ram_avails'][idx] >= vnf['reqRAM'] / self.max_ram
         return enough_cpu and enough_ram
 
     def restore_avail_resources(self, nspr: nx.Graph):
@@ -131,9 +127,9 @@ class NetworkSimulator(gym.Env):
                 # restore nodes' resources availabilities
                 if vnf['placed'] >= 0:
                     idx = self.map_id_idx[vnf['placed']]
-                    self._obs_dict['cpu_avails'][idx] += vnf['reqCPU'] / self.max_cpu
-                    self._obs_dict['ram_avails'][idx] += vnf['reqRAM'] / self.max_ram
-                    self._obs_dict['placement_state'][idx] -= 1
+                    self.obs_dict['cpu_avails'][idx] += vnf['reqCPU'] / self.max_cpu
+                    self.obs_dict['ram_avails'][idx] += vnf['reqRAM'] / self.max_ram
+                    self.obs_dict['placement_state'][idx] -= 1
             for _, vl in nspr.edges.items():
                 # restore links' resources availabilities
                 if vl['placed']:
@@ -147,8 +143,8 @@ class NetworkSimulator(gym.Env):
                         physical_link['availBW'] += vl['reqBW']
                         idx_1 = self.map_id_idx[id_1]
                         idx_2 = self.map_id_idx[id_2]
-                        self._obs_dict['bw_avails'][idx_1] += rewBW_normalized
-                        self._obs_dict['bw_avails'][idx_2] += rewBW_normalized
+                        self.obs_dict['bw_avails'][idx_1] += rewBW_normalized
+                        self.obs_dict['bw_avails'][idx_2] += rewBW_normalized
 
     def pick_next_nspr(self):
         """ Pick the next NSPR to be evaluated and updates the attribute 'self.cur_nspr' """
@@ -158,7 +154,7 @@ class NetworkSimulator(gym.Env):
             self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
             self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
             # self.tot_seen_nsprs += 1
-            _ = self.update_nspr_state()    # _obs_dict updated withing method
+            _ = self.update_nspr_state()    # obs_dict updated within method
 
     def check_for_departed_nsprs(self):
         """ Checks it some NSPRs have reached their departure time and in case
@@ -270,17 +266,21 @@ class NetworkSimulator(gym.Env):
 
         # scan all nodes and save data in lists
         self.max_cpu = self.max_ram = self.max_bw = 0
+        self.tot_cpu_cap = self.tot_ram_cap = self.tot_bw_cap = 0
         for node_id, node in self.psn.nodes.items():
             # get nodes' capacities (if routers, set these to 0)
             cpu_avails[self.map_id_idx[node_id]] = node.get('availCPU', 0)
             ram_avails[self.map_id_idx[node_id]] = node.get('availRAM', 0)
             tot_bw = 0
             for extremes, link in self.psn.edges.items():
+                self.tot_bw_cap += link['BWcap']
                 if node_id in extremes:
                     bw_avails[self.map_id_idx[node_id]] += link['availBW']
                     tot_bw += link['BWcap']
             # update the max CPU / RAM / BW capacities
             if node['NodeType'] == 'server':
+                self.tot_cpu_cap += node['CPUcap']
+                self.tot_ram_cap += node['RAMcap']
                 if node['CPUcap'] > self.max_cpu:
                     self.max_cpu = node['CPUcap']
                 if node['RAMcap'] > self.max_ram:
@@ -343,11 +343,11 @@ class NetworkSimulator(gym.Env):
             cur_vnf_bw_req = np.array([0], dtype=float)
             vnfs_still_to_place = np.array([0], dtype=int)
 
-        self._obs_dict['cur_vnf_cpu_req'] = cur_vnf_cpu_req
-        self._obs_dict['cur_vnf_ram_req'] = cur_vnf_ram_req
-        self._obs_dict['cur_vnf_bw_req'] = cur_vnf_bw_req
-        self._obs_dict['vnfs_still_to_place'] = vnfs_still_to_place
-        return self._obs_dict
+        self.obs_dict['cur_vnf_cpu_req'] = cur_vnf_cpu_req
+        self.obs_dict['cur_vnf_ram_req'] = cur_vnf_ram_req
+        self.obs_dict['cur_vnf_bw_req'] = cur_vnf_bw_req
+        self.obs_dict['vnfs_still_to_place'] = vnfs_still_to_place
+        return self.obs_dict
 
     def reset(self, **kwargs) -> GymObs:
         """ Method used to reset the environment
@@ -381,10 +381,17 @@ class NetworkSimulator(gym.Env):
         # self._obs_dict = self._init_obs_dict()
 
         # ALTERNATIVE 2: slightly faster on paper, but does not work with changing PSNs
-        del self._obs_dict
-        self._obs_dict = copy.deepcopy(self._empty_psn_obs_dict)
+        del self.obs_dict
+        self.obs_dict = copy.deepcopy(self._empty_psn_obs_dict)
 
-        return self._obs_dict
+        # get arrived NSPRs
+        self.waiting_nsprs += self.nsprs.get(self.time_step, [])
+        self.pick_next_nspr()
+
+        # new observation
+        obs = self.update_nspr_state()
+
+        return obs
 
     def step(self, action: int) -> Tuple[GymObs, float, bool, dict]:
         """ Perform an action in the environment
@@ -416,15 +423,18 @@ class NetworkSimulator(gym.Env):
             # update the resources availabilities of the physical node in the obs dict
             self.cur_vnf['placed'] = physical_node_id
             idx = self.map_id_idx[physical_node_id]
-            self._obs_dict['cpu_avails'][idx] -= self.cur_vnf['reqCPU'] / self.max_cpu
-            self._obs_dict['ram_avails'][idx] -= self.cur_vnf['reqRAM'] / self.max_ram
-            self._obs_dict['placement_state'][idx] += 1
+            self.obs_dict['cpu_avails'][idx] -= self.cur_vnf['reqCPU'] / self.max_cpu
+            self.obs_dict['ram_avails'][idx] -= self.cur_vnf['reqRAM'] / self.max_ram
+            self.obs_dict['placement_state'][idx] += 1
 
             # update acceptance reward and tr_load balancing reward
             self._acceptance_rewards.append(self.rval_accepted_vnf)
-            self._load_balancing_rewards.append(
-                self._obs_dict['cpu_avails'][idx] * self.max_cpu / physical_node['CPUcap'] +
-                self._obs_dict['ram_avails'][idx] * self.max_ram / physical_node['RAMcap']
+            self._load_balance_rewards.append(
+                self.obs_dict['cpu_avails'][idx] * self.max_cpu / physical_node['CPUcap'] +
+                self.obs_dict['ram_avails'][idx] * self.max_ram / physical_node['RAMcap'] +
+
+                # TODO: this is not included in HADRL, but it's to prevent zero reward for successful placements
+                0.1
             )
 
             # connect the placed VNF to the other VNFs it's supposed to be connected to
@@ -462,8 +472,8 @@ class NetworkSimulator(gym.Env):
                             physical_link = self.psn.edges[psn_path[i], psn_path[i + 1]]
                             extreme1_idx = self.map_id_idx[psn_path[i]]
                             extreme2_idx = self.map_id_idx[psn_path[i + 1]]
-                            self._obs_dict['bw_avails'][extreme1_idx] -= vl['reqBW'] / self.max_bw
-                            self._obs_dict['bw_avails'][extreme2_idx] -= vl['reqBW'] / self.max_bw
+                            self.obs_dict['bw_avails'][extreme1_idx] -= vl['reqBW'] / self.max_bw
+                            self.obs_dict['bw_avails'][extreme2_idx] -= vl['reqBW'] / self.max_bw
                             # note: here the PSN is actually modified: the available
                             # BW of the link is decreased. Needed for shortest path computation
                             physical_link['availBW'] -= vl['reqBW']
@@ -492,23 +502,36 @@ class NetworkSimulator(gym.Env):
             # save the ID of the next VNF
             if self.cur_nspr_unplaced_vnfs_ids:
                 self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
-                reward = 0  # global reward is non-zero only after the whole NSPR is placed
+                # reward = 0  # global reward is non-zero only after the whole NSPR is placed
+
+                # TODO: different reward than HADRL (experiment)
+                reward = self._acceptance_rewards[-1] * \
+                         self._load_balance_rewards[-1] * \
+                         self._resource_consumption_rewards[-1] / len(self.cur_nspr.nodes) / \
+                         10.    # che se no a volte ci sono reward globali più basse di alcune reward parziali
+                reward = self._normal_reward_as_hadrl(reward)
             else:
                 # it means we finished the VNFs of the current NSPR
                 self.nsprs_seen_in_cur_ep += 1
                 self.tot_seen_nsprs += 1
                 if self.nsprs_seen_in_cur_ep >= self.nsprs_per_episode:
                     self.done = True
+                # reset placement state
+                self.obs_dict['placement_state'] = np.zeros(len(self.psn.nodes), dtype=int)
                 # update global reward because the NSPR is fully placed
                 reward = np.stack((self._acceptance_rewards,
                                    self._resource_consumption_rewards,
-                                   self._load_balancing_rewards)).prod(axis=0).sum()
+                                   self._load_balance_rewards)).prod(axis=0).sum()
                 # normalize the reward to be in [0, 10] (as they do in HA-DRL)
-                reward = self._normal_reward_as_hadrl(reward)
+                reward = self._normal_reward_as_hadrl(reward) * \
+                         2  # TODO: per dargli più peso (non da HADRL)
                 self.reset_partial_rewards()
                 self.cur_nspr = None    # marked as None so a new one can be picked
                 # update the acceptance ratio
                 self.accepted_nsprs += 1
+
+        # increase time step
+        self.time_step += 1
 
         # check for new and departing NSPRs
         self.check_for_departed_nsprs()
@@ -517,9 +540,6 @@ class NetworkSimulator(gym.Env):
 
         # new observation
         obs = self.update_nspr_state()
-
-        # increase time step
-        self.time_step += 1
 
         return obs, reward, self.done, info
 

@@ -24,6 +24,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
             ram_req_per_vnf: int = 150,
             bw_req_per_vl: int = 2000,
             load: float = 0.5,
+            always_one: bool = False
     ):
         super().__init__(env)
         if self.env.nsprs_per_episode is not None:
@@ -39,6 +40,7 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
         self.ram_req_per_vnf = ram_req_per_vnf
         self.bw_req_per_vl = bw_req_per_vl
         self.load = load
+        self.always_one = always_one
         self.tot_cpu_cap = self._get_tot_cpu_cap()
         self.nspr_model = self._get_nspr_model()
         self.max_steps = None
@@ -52,8 +54,11 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
         self.arr_rate = self.load * self.tot_cpu_cap / self.nsprs_duration / self.cpu_req_per_vnf / self.vnfs_per_nspr
 
     def reset(self, **kwargs):
-        obs = self.env.reset(**kwargs)
+        self.env.reset(**kwargs)
         self.unwrapped.nsprs = self._generate_nsprs()
+        self.unwrapped.waiting_nsprs += self.unwrapped.nsprs.get(self.unwrapped.time_step, [])
+        self.unwrapped.pick_next_nspr()
+        obs = self.unwrapped.update_nspr_state()
         return obs
 
     def _get_nspr_model(self):
@@ -67,11 +72,19 @@ class NSPRsGeneratorHADRL(gym.Wrapper):
         return nspr_model
 
     def _generate_nsprs(self):
-        if self.arr_rate >= 0.3:
+        if self.always_one:
+            nsprs_dict = self._generate_one_nspr()
+        elif self.arr_rate >= 0.3:
             nsprs_dict = self._generate_nsprs_poisson()
         else:
             nsprs_dict = self._generate_nsprs_deterministic()
         return nsprs_dict
+
+    def _generate_one_nspr(self):
+        nspr = self._get_nspr_model()
+        nspr.graph['ArrivalTime'] = self.env.time_step
+        nspr.graph['duration'] = 100
+        return {self.env.time_step: [nspr]}
 
     def _generate_nsprs_poisson(self):
         cur_arr_time = self.env.time_step

@@ -6,6 +6,7 @@ import numpy as np
 
 from environments.network_simulator import NetworkSimulator
 from wrappers import ResetWithRandLoad, NSPRsGeneratorHADRL
+from wrappers.reset_with_load import ResetWithLoadMixed, ResetWithLoadBinary, ResetWithRealisticLoad
 
 
 def make_env(
@@ -13,8 +14,8 @@ def make_env(
         base_env_kwargs: Optional[dict] = None,
         time_limit: bool = False,
         time_limit_kwargs: Optional[dict] = None,
-        reset_with_rand_load: bool = False,
-        reset_with_rand_load_kwargs: Optional[dict] = None,
+        reset_with_load: bool = False,
+        reset_with_load_kwargs: Optional[dict] = None,
         hadrl_nsprs: bool = False,
         hadrl_nsprs_kwargs: Optional[dict] = None,
 ):
@@ -26,14 +27,14 @@ def make_env(
     :param base_env_kwargs: kwargs of the base environment
     :param time_limit: if True, the env is wrapped with TimeLimit wrapper
     :param time_limit_kwargs: kwargs of the TimeLimit wrapper
-    :param reset_with_rand_load: if True, the env is wrapped with ResetWithRandLoad wrapper
-    :param reset_with_rand_load_kwargs: kwargs for the ResetWithRandLoad wrapper
+    :param reset_with_load: if True, the env is wrapped with ResetWithRandLoad wrapper
+    :param reset_with_load_kwargs: kwargs for the ResetWithRandLoad wrapper
     :param hadrl_nsprs: if True, the env is wrapped with NSPRsGeneratorHADRL wrapper
     :param hadrl_nsprs_kwargs: kwargs for the NSPRsGeneratorHADRL wrapper
     """
     base_env_kwargs = {} if base_env_kwargs is None else base_env_kwargs
     time_limit_kwargs = {} if time_limit_kwargs is None else time_limit_kwargs
-    reset_with_rand_load_kwargs = {} if reset_with_rand_load_kwargs is None else reset_with_rand_load_kwargs
+    reset_with_load_kwargs = {} if reset_with_load_kwargs is None else reset_with_load_kwargs
 
     env = NetworkSimulator(
         psn_file=psn_path,
@@ -44,10 +45,10 @@ def make_env(
     )
     if time_limit:
         env = gym.wrappers.TimeLimit(env, **time_limit_kwargs)
-    if reset_with_rand_load:
-        env = ResetWithRandLoad(env, **reset_with_rand_load_kwargs)
     if hadrl_nsprs:
         env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
+    if reset_with_load:
+        env = ResetWithRealisticLoad(env, **reset_with_load_kwargs)
     return env
 
 

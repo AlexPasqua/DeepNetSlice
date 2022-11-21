@@ -7,7 +7,7 @@ from utils import make_env
 if __name__ == '__main__':
     # load model
     model = A2C.load(
-        path="../wandb/run-20221109_094512-3tit0aki/files/model.zip",
+        path="../wandb/run-20221113_204348-sxby78j6/files/model.zip",
         env=None,
         device='cuda:0',
         print_system_info=True,
@@ -22,7 +22,7 @@ if __name__ == '__main__':
             psn_path="../PSNs/hadrl_psn.graphml",
             time_limit=True,
             time_limit_kwargs=dict(max_episode_steps=1000),
-            reset_with_rand_load=False,
+            reset_with_load=False,
             hadrl_nsprs=True,
             hadrl_nsprs_kwargs=dict(nsprs_per_ep=None,
                                     load=0.5)
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     accepted = seen = 0.0
     accept_ratio_per_ep = []
     for i in range(10_000):
-        action, _states = model.predict(obs, deterministic=True)
+        action, _states = model.predict(obs, deterministic=False)
         obs, rewards, done, info = env.step(action)
         # acceptance ratio
         if rewards[0] != 0.0:

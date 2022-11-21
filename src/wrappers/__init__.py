@@ -1,3 +1,3 @@
 from .prevent_infeasible_actions import PreventInfeasibleActions
-from .reset_with_load import ResetWithFixedLoad, ResetWithRandLoad
+from .reset_with_load import ResetWithFixedLoad, ResetWithRandLoad, ResetWithLoadMixed, ResetWithRealisticLoad
 from .hadrl_nsprs_generator import NSPRsGeneratorHADRL

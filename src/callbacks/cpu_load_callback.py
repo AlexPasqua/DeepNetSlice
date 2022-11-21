@@ -20,6 +20,7 @@ class CPULoadCallback(BaseCallback):
         self.freq = freq
 
     def _on_step(self) -> bool:
+        # TODO: it works only if all the servers have the same max CPU capacity
         if self.n_calls % self.freq == 0:
             loads = []
             observations = self.env.get_attr('obs_dict')

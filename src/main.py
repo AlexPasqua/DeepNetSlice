@@ -1,7 +1,9 @@
+import networkx as nx
 import wandb
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
 from wandb.integration.sb3 import WandbCallback
 
@@ -12,27 +14,38 @@ from callbacks.acceptance_ratio_callbacks import AcceptanceRatioByNSPRsCallback
 from heuristic_layers import P2CLoadBalanceHeuristic
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
-from utils import make_env
+from utils import make_env, create_HADRL_PSN_file
 
 if __name__ == '__main__':
-    psn_path = '../PSNs/hadrl_psn.graphml'
+    # psn = nx.complete_graph(6)
+    # for _, node in psn.nodes.items():
+    #     node['NodeType'] = 'server'
+    #     node['CPUcap'] = node['availCPU'] = 50
+    #     node['RAMcap'] = node['availRAM'] = 300
+    # for _, edge in psn.edges.items():
+    #     edge['BWcap'] = edge['availBW'] = 10000     # 10 Gbps
+    psn_path = '../PSNs/waxman_psn.graphml'
+    # nx.write_graphml(psn, psn_path)
 
     # create_HADRL_PSN_file(
     #     path=psn_path,
-    #     # n_CDCs=2,
-    #     # n_EDCs=6,
-    #     # n_servers_per_DC=(5, 3, 2),
-    #     # n_EDCs_per_CDC=3
+    #     n_CDCs=0,
+    #     n_EDCs=0,
+    #     n_servers_per_DC=(5, 3, 2),
+    #     n_EDCs_per_CDC=1
     # )
 
     psn = reader.read_psn(psn_path)
 
     # training environment
-    n_tr_envs = 1
-    tr_nsprs_per_ep = None
-    tr_load = 0.1
-    tr_time_limit = True
+    n_tr_envs = 14
+    tr_nsprs_per_ep = 1
+    tr_load = 0.9
+    tr_time_limit = False
     tr_max_ep_steps = 1000
+    tr_reset_load = True
+    # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
+    tr_reset_load_kwargs = dict(cpu_load=0.75)
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=n_tr_envs,
@@ -40,19 +53,25 @@ if __name__ == '__main__':
             psn_path=psn_path,
             time_limit=tr_time_limit,
             time_limit_kwargs=dict(max_episode_steps=tr_max_ep_steps),
-            reset_with_rand_load=False,
             hadrl_nsprs=True,
             hadrl_nsprs_kwargs=dict(nsprs_per_ep=tr_nsprs_per_ep,
-                                    load=tr_load)
+                                    vnfs_per_nspr=2,
+                                    load=tr_load,
+                                    always_one=True),
+            reset_with_load=tr_reset_load,
+            reset_with_load_kwargs=tr_reset_load_kwargs
         ),
     )
 
     # evaluation environment
-    n_eval_envs = 1
-    eval_nsprs_per_ep = None
-    eval_load = 0.1
-    eval_time_limit = True
+    n_eval_envs = 4
+    eval_nsprs_per_ep = 1
+    eval_load = 0.9
+    eval_time_limit = False
     eval_max_ep_steps = 1000
+    eval_reset_with_load = True
+    # eval_reset_with_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
+    eval_reset_with_load_kwargs = dict(cpu_load=0.75)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -60,10 +79,13 @@ if __name__ == '__main__':
             psn_path=psn_path,
             time_limit=eval_time_limit,
             time_limit_kwargs=dict(max_episode_steps=eval_max_ep_steps),
-            reset_with_rand_load=False,
+            reset_with_load=eval_reset_with_load,
+            reset_with_load_kwargs=eval_reset_with_load_kwargs,
             hadrl_nsprs=True,
             hadrl_nsprs_kwargs=dict(nsprs_per_ep=eval_nsprs_per_ep,
-                                    load=eval_load)
+                                    vnfs_per_nspr=2,
+                                    load=eval_load,
+                                    always_one=True)
         ),
     )
 
@@ -76,7 +98,7 @@ if __name__ == '__main__':
                          # net_arch=[dict(pi=[256, 128], vf=[256, 128, 64])],
                          net_arch=[256, 128, 64, dict(vf=[32])],
                          servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                         gcn_layers_dims=(60, 50, 40, 20),
+                         gcn_layers_dims=(10,),
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs,)
 
@@ -90,17 +112,18 @@ if __name__ == '__main__':
     #             tensorboard_log="../tb_logs_fixed-nsprs-generation/",
     #             policy_kwargs=policy_kwargs)
 
-    model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:1',
-                learning_rate=0.05,
-                n_steps=1000,  # ogni quanti step fare un update
-                gamma=0.95,
-                ent_coef=0.5,
-                max_grad_norm=0.9,
+    model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
+                learning_rate=0.001,
+                n_steps=1,  # ogni quanti step fare un update
+                gamma=0.99,
+                ent_coef=0.01,
+                gae_lambda=0.92,
+                # max_grad_norm=0.9,
                 use_rms_prop=True,
-                tensorboard_log="../tb_logs_fixed-nsprs-generation/",
+                tensorboard_log="../tb_logs_realistic-load/",
                 policy_kwargs=dict(
                     activation_fn=nn.Tanh,
-                    net_arch=[256, 128, dict(vf=[64, 32])],
+                    net_arch=[32, dict(pi=[16], vf=[16])],
                     features_extractor_class=HADRLFeaturesExtractor,
                     features_extractor_kwargs=dict(
                         psn=psn,
@@ -112,7 +135,7 @@ if __name__ == '__main__':
     print(model.policy)
 
     # define some training hyperparams
-    tot_tr_steps = 4_000_000
+    tot_tr_steps = 100_000_000
 
     # wandb stuff
     config = {
@@ -132,7 +155,7 @@ if __name__ == '__main__':
         **heu_kwargs,
     }
     wandb_run = wandb.init(
-        project="Fixed NSPR's generation",
+        project="Realistic load - reduced example",
         dir="../",
         # name="Simpler HADRL-style PSN - branch main",
         config=config,
@@ -160,7 +183,7 @@ if __name__ == '__main__':
                       verbose=2,
                       model_save_freq=10_000),
 
-        EvalCallback(eval_env=eval_env, n_eval_episodes=1, warn=True,
+        EvalCallback(eval_env=eval_env, n_eval_episodes=100, warn=True,
                      eval_freq=5_000, deterministic=False, verbose=2,
                      callback_after_eval=AcceptanceRatioByNSPRsCallback(
                          env=eval_env,
@@ -171,12 +194,12 @@ if __name__ == '__main__':
 
         # NOTE: currently it works only if all the servers have the same max CPU cap
         # (routers & switches, that have no CPU, are not a problem)
-        CPULoadCallback(env=tr_env, freq=200),
+        CPULoadCallback(env=tr_env, freq=500),
     ]
 
     # model training
     model.learn(total_timesteps=tot_tr_steps,
-                log_interval=4,
+                log_interval=10,
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
