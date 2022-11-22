@@ -13,6 +13,7 @@ class HParamCallback(BaseCallback):
             eval_nsprs_per_ep: int = None,
             eval_psn_load: float = None,
             eval_max_ep_steps: int = None,
+            vnfs_per_nsprs: int = None,
             use_heuristic: bool = False,
             heu_kwargs: dict = None,
     ):
@@ -31,6 +32,7 @@ class HParamCallback(BaseCallback):
         self.eval_nsprs_per_ep = eval_nsprs_per_ep
         self.eval_psn_load = eval_psn_load
         self.eval_max_ep_steps = eval_max_ep_steps
+        self.vnfs_per_nspr = vnfs_per_nsprs
         self.use_heuristic = use_heuristic
         self.heu_kwargs = heu_kwargs if heu_kwargs is not None else {}
         if 'heu_class' in self.heu_kwargs:
@@ -58,6 +60,7 @@ class HParamCallback(BaseCallback):
             "NSPRs per eval episode": self.eval_nsprs_per_ep,
             # "PSN load (eval)": self.eval_psn_load,
             "max steps per eval episode": self.eval_max_ep_steps,
+            "VNFs/NSPR": self.vnfs_per_nspr,
             "GCN layers dimensions": gcn_layers_dims,
             "Use heuristic": self.use_heuristic,
             "Heuristic class": self.heu_class,

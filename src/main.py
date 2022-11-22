@@ -113,7 +113,7 @@ if __name__ == '__main__':
     #             policy_kwargs=policy_kwargs)
 
     model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:1',
-                learning_rate=0.0001,
+                learning_rate=0.0005,
                 n_steps=20,  # ogni quanti step fare un update
                 gamma=0.99,
                 ent_coef=0.01,
@@ -154,14 +154,14 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    # wandb_run = wandb.init(
-    #     project="Waxman graph",
-    #     dir="../",
-    #     # name="Simpler HADRL-style PSN - branch main",
-    #     config=config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     save_code=True,  # optional
-    # )
+    wandb_run = wandb.init(
+        project="Waxman graph",
+        dir="../",
+        # name="Simpler HADRL-style PSN - branch main",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        save_code=True,  # optional
+    )
 
     # training callbacks
     list_of_callbacks = [
@@ -179,9 +179,9 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-        #               verbose=2,
-        #               model_save_freq=10_000),
+        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+                      verbose=2,
+                      model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=100, warn=True,
                      eval_freq=5_000, deterministic=False, verbose=2,
@@ -203,4 +203,4 @@ if __name__ == '__main__':
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    # wandb_run.finish()
+    wandb_run.finish()
