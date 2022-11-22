@@ -49,6 +49,8 @@ def make_env(
         env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
     if reset_with_load:
         env = ResetWithRealisticLoad(env, **reset_with_load_kwargs)
+        # env = ResetWithLoadMixed(env, **reset_with_load_kwargs)
+        # env = ResetWithLoadBinary(env, **reset_with_load_kwargs)
     return env
 
 

@@ -186,7 +186,9 @@ class ResetWithLoadMixed(gym.Wrapper):
 
         # NOTE: only works if all the envs in the VecEnv use the same PSN
         if self.tot_cpu_cap is None or self.tot_ram_cap is None or self.tot_bw_cap is None:
-            self.tot_cpu_cap, self.tot_ram_cap, self.tot_bw_cap = self._get_capacities(psns[0])
+            self.tot_cpu_cap = self.env.tot_cpu_cap
+            self.tot_ram_cap = self.env.tot_ram_cap
+            self.tot_bw_cap = self.env.tot_bw_cap
 
         self.vl_req_bw = 2000
         for i, psn in enumerate(psns):
@@ -265,17 +267,6 @@ class ResetWithLoadMixed(gym.Wrapper):
 
         return
 
-    @staticmethod
-    def _get_capacities(psn):
-        """ Get capacities of resources in the psn """
-        cpu_cap = ram_cap = bw_cap = 0
-        for _, node in psn.nodes.items():
-            cpu_cap += node.get('CPUcap', 0)
-            ram_cap += node.get('RAMcap', 0)
-        for _, link in psn.edges.items():
-            bw_cap += link.get('BWcap', 0)
-        return cpu_cap, ram_cap, bw_cap
-
 
 class ResetWithLoadBinary(ResetWithLoadMixed):
     """ Wrapper to reset the PSN with a certain load.
@@ -318,15 +309,17 @@ class ResetWithLoadBinary(ResetWithLoadMixed):
         obs_dicts = self.env.get_attr('obs_dict') if isinstance(self.env, VecEnv) else [self.env.obs_dict]
         maps_id_idx = self.env.get_attr('map_id_idx') if isinstance(self.env, VecEnv) else [self.env.map_id_idx]
 
-        if self.cpu_cap is None or self.ram_cap is None or self.bw_cap is None:
-            self.cpu_cap, self.ram_cap, self.bw_cap = self._get_capacities(psns[0])
+        if self.tot_cpu_cap is None or self.tot_ram_cap is None or self.tot_bw_cap is None:
+            self.tot_cpu_cap = self.env.tot_cpu_cap
+            self.tot_ram_cap = self.env.tot_ram_cap
+            self.tot_bw_cap = self.env.tot_bw_cap
 
         for i, psn in enumerate(psns):
             max_cpu, max_ram, max_bw = max_cpus[i], max_rams[i], max_bws[i]
             obs_dict, map_id_idx = obs_dicts[i], maps_id_idx[i]
-            tot_cpu_to_remove = self.cpu_load * self.cpu_cap / max_cpu
-            tot_ram_to_remove = self.ram_load * self.ram_cap / max_ram
-            tot_bw_to_remove = self.bw_load * self.bw_cap / max_bw
+            tot_cpu_to_remove = self.cpu_load * self.tot_cpu_cap / max_cpu
+            tot_ram_to_remove = self.ram_load * self.tot_ram_cap / max_ram
+            tot_bw_to_remove = self.bw_load * self.tot_bw_cap / max_bw
             # iterate over nodes in a random order and reduce the CPU/RAM availabilities
             nodes = list(psn.nodes.items())
             while tot_cpu_to_remove > 0 or tot_ram_to_remove > 0:

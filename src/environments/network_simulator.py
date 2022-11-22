@@ -502,14 +502,14 @@ class NetworkSimulator(gym.Env):
             # save the ID of the next VNF
             if self.cur_nspr_unplaced_vnfs_ids:
                 self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
-                # reward = 0  # global reward is non-zero only after the whole NSPR is placed
+                reward = 0  # global reward is non-zero only after the whole NSPR is placed
 
-                # TODO: different reward than HADRL (experiment)
-                reward = self._acceptance_rewards[-1] * \
-                         self._load_balance_rewards[-1] * \
-                         self._resource_consumption_rewards[-1] / len(self.cur_nspr.nodes) / \
-                         10.    # che se no a volte ci sono reward globali più basse di alcune reward parziali
-                reward = self._normal_reward_as_hadrl(reward)
+                # # TODO: different reward than HADRL (experiment)
+                # reward = self._acceptance_rewards[-1] * \
+                #          self._load_balance_rewards[-1] * \
+                #          self._resource_consumption_rewards[-1] / len(self.cur_nspr.nodes) / \
+                #          10.    # che se no a volte ci sono reward globali più basse di alcune reward parziali
+                # reward = self._normal_reward_as_hadrl(reward)
             else:
                 # it means we finished the VNFs of the current NSPR
                 self.nsprs_seen_in_cur_ep += 1
