@@ -15,6 +15,7 @@ from heuristic_layers import P2CLoadBalanceHeuristic
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
 from utils import make_env, create_HADRL_PSN_file
+from wrappers import ResetWithRealisticLoad
 
 if __name__ == '__main__':
     # psn = nx.complete_graph(6)
@@ -43,7 +44,7 @@ if __name__ == '__main__':
     tr_load = 0.9
     tr_time_limit = False
     tr_max_ep_steps = 1000
-    tr_reset_load = True
+    tr_reset_load_class = ResetWithRealisticLoad
     # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
     tr_reset_load_kwargs = dict(cpu_load=0.73)
     tr_env = make_vec_env(
@@ -58,8 +59,8 @@ if __name__ == '__main__':
                                     vnfs_per_nspr=3,
                                     load=tr_load,
                                     always_one=True),
-            reset_with_load=tr_reset_load,
-            reset_with_load_kwargs=tr_reset_load_kwargs
+            reset_load_class=tr_reset_load_class,
+            reset_load_kwargs=tr_reset_load_kwargs
         ),
     )
 
@@ -69,9 +70,9 @@ if __name__ == '__main__':
     eval_load = 0.9
     eval_time_limit = False
     eval_max_ep_steps = 1000
-    eval_reset_with_load = True
+    eval_reset_load_class = ResetWithRealisticLoad
     # eval_reset_with_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    eval_reset_with_load_kwargs = dict(cpu_load=0.73)
+    eval_reset_load_kwargs = dict(cpu_load=0.73)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -79,8 +80,8 @@ if __name__ == '__main__':
             psn_path=psn_path,
             time_limit=eval_time_limit,
             time_limit_kwargs=dict(max_episode_steps=eval_max_ep_steps),
-            reset_with_load=eval_reset_with_load,
-            reset_with_load_kwargs=eval_reset_with_load_kwargs,
+            reset_load_class=eval_reset_load_class,
+            reset_load_kwargs=eval_reset_load_kwargs,
             hadrl_nsprs=True,
             hadrl_nsprs_kwargs=dict(nsprs_per_ep=eval_nsprs_per_ep,
                                     vnfs_per_nspr=3,
@@ -113,8 +114,8 @@ if __name__ == '__main__':
     #             policy_kwargs=policy_kwargs)
 
     model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:1',
-                learning_rate=0.0005,
-                n_steps=20,  # ogni quanti step fare un update
+                learning_rate=0.0001,
+                n_steps=2,  # ogni quanti step fare un update
                 gamma=0.99,
                 ent_coef=0.01,
                 gae_lambda=0.92,
@@ -137,6 +138,47 @@ if __name__ == '__main__':
     # define some training hyperparams
     tot_tr_steps = 10_000_000
 
+    # training callbacks
+    if tr_reset_load_class is not None:
+        tr_load = tr_reset_load_kwargs.get('cpu_load', None)
+    if eval_reset_load_class is not None:
+        eval_load = eval_reset_load_kwargs.get('cpu_load', None)
+    list_of_callbacks = [
+        # AcceptanceRatioByStepsCallback(env=tr_env, name="Acceptance ratio (by steps)",
+        #                                steps_per_tr_phase=500, verbose=2),
+
+        AcceptanceRatioByNSPRsCallback(env=tr_env, name="Train acceptance ratio (by NSPRs)",
+                                       nsprs_per_tr_phase=100, verbose=2),
+
+        HParamCallback(n_tr_envs=tr_env.num_envs,
+                       n_eval_envs=eval_env.num_envs,
+                       tr_nsprs_per_ep=tr_nsprs_per_ep,
+                       tr_psn_load=tr_load,
+                       tr_max_ep_steps=tr_max_ep_steps if tr_time_limit else None,
+                       eval_nsprs_per_ep=eval_nsprs_per_ep,
+                       eval_psn_load=eval_load,
+                       eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
+                       use_heuristic=use_heuristic,
+                       heu_kwargs=heu_kwargs),
+
+        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+        #               verbose=2,
+        #               model_save_freq=10_000),
+
+        EvalCallback(eval_env=eval_env, n_eval_episodes=100, warn=True,
+                     eval_freq=5_000, deterministic=False, verbose=2,
+                     callback_after_eval=AcceptanceRatioByNSPRsCallback(
+                         env=eval_env,
+                         name="Eval acceptance ratio (by NSPRs)",
+                         nsprs_per_tr_phase=1,  # must be 1 for eval (default value)
+                         verbose=2
+                     )),
+
+        # NOTE: currently it works only if all the servers have the same max CPU cap
+        # (routers & switches, that have no CPU, are not a problem)
+        CPULoadCallback(env=tr_env, freq=5000),
+    ]
+
     # wandb stuff
     config = {
         "policy name": policy.name,
@@ -155,47 +197,13 @@ if __name__ == '__main__':
         **heu_kwargs,
     }
     wandb_run = wandb.init(
-        project="Waxman graph",
+        project="prova",
         dir="../",
         # name="Simpler HADRL-style PSN - branch main",
         config=config,
         sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
         save_code=True,  # optional
     )
-
-    # training callbacks
-    list_of_callbacks = [
-        # AcceptanceRatioByStepsCallback(env=tr_env, name="Acceptance ratio (by steps)",
-        #                                steps_per_tr_phase=500, verbose=2),
-
-        AcceptanceRatioByNSPRsCallback(env=tr_env, name="Train acceptance ratio (by NSPRs)",
-                                       nsprs_per_tr_phase=100, verbose=2),
-
-        HParamCallback(tr_env.num_envs, eval_env.num_envs, tr_nsprs_per_ep,
-                       tr_load,
-                       tr_max_ep_steps=tr_max_ep_steps if tr_time_limit else None,
-                       eval_nsprs_per_ep=eval_nsprs_per_ep,
-                       eval_psn_load=eval_load,
-                       eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
-                       use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
-
-        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-                      verbose=2,
-                      model_save_freq=10_000),
-
-        EvalCallback(eval_env=eval_env, n_eval_episodes=100, warn=True,
-                     eval_freq=5_000, deterministic=False, verbose=2,
-                     callback_after_eval=AcceptanceRatioByNSPRsCallback(
-                         env=eval_env,
-                         name="Eval acceptance ratio (by NSPRs)",
-                         nsprs_per_tr_phase=1,  # must be 1 for eval (default value)
-                         verbose=2
-                     )),
-
-        # NOTE: currently it works only if all the servers have the same max CPU cap
-        # (routers & switches, that have no CPU, are not a problem)
-        CPULoadCallback(env=tr_env, freq=5000),
-    ]
 
     # model training
     model.learn(total_timesteps=tot_tr_steps,

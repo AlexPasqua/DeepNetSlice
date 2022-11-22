@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env import VecEnv
 class ResetWithLoad(gym.Wrapper, ABC):
     """ Abstract class. Wrapper to reset the PSN with a certain tr_load """
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gym.Env, **kwargs):
         super().__init__(env)
         self.cpu_load = self.ram_load = self.bw_load = 0.
 
@@ -36,7 +36,8 @@ class ResetWithLoad(gym.Wrapper, ABC):
 class ResetWithFixedLoad(ResetWithLoad):
     """ Reset the PSN with a certain - fixed - amount of tr_load """
 
-    def __init__(self, env: gym.Env, reset_load_perc: Union[float, dict] = 0.):
+    def __init__(self, env: gym.Env, reset_load_perc: Union[float, dict] = 0.,
+                 **kwargs):
         """ Constructor
 
         :param env: :param env: the environment to wrap
@@ -61,7 +62,8 @@ class ResetWithRandLoad(ResetWithLoad):
     """ Reset the PSN with a random uniform amount of tr_load """
 
     def __init__(self, env: gym.Env, min_perc: Union[float, dict],
-                 max_perc: Union[float, dict], same_for_all: bool = True):
+                 max_perc: Union[float, dict], same_for_all: bool = True,
+                 **kwargs):
         """ Constructor
 
         :param env: the environment to wrap
@@ -128,7 +130,8 @@ class ResetWithLoadMixed(gym.Wrapper):
             env: Union[gym.Env, VecEnv],
             load: Union[float, Dict[str, float]] = 0.5,
             rand_load: bool = False,
-            rand_range: Tuple[float, float] = (0., 1.)
+            rand_range: Tuple[float, float] = (0., 1.),
+            **kwargs
     ):
         """
         :param env: environment
@@ -283,7 +286,8 @@ class ResetWithLoadBinary(ResetWithLoadMixed):
             env: Union[gym.Env, VecEnv],
             load: Union[float, Dict[str, float]] = 0.5,
             rand_load: bool = False,
-            rand_range: Tuple[float, float] = (0., 1.)
+            rand_range: Tuple[float, float] = (0., 1.),
+            **kwargs
     ):
         """
         :param env: environment
