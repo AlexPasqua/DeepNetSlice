@@ -73,11 +73,11 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         )
         # non-shared features extractors for the actor and the critic
         self.policy_features_extractor = HADRLFeaturesExtractor(
-            observation_space, psn, th.tanh, gcn_layers_dims,
+            observation_space, psn, nn.Tanh, gcn_layers_dims,
             nspr_out_features
         )
         self.value_features_extractor = HADRLFeaturesExtractor(
-            observation_space, psn, th.relu, gcn_layers_dims,
+            observation_space, psn, nn.ReLU, gcn_layers_dims,
             nspr_out_features
         )
         self.features_dim = {'pi': self.policy_features_extractor.features_dim,
