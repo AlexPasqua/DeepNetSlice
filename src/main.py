@@ -15,20 +15,19 @@ from heuristic_layers import P2CLoadBalanceHeuristic
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
 from utils import make_env, create_HADRL_PSN_file
-from wrappers import ResetWithRealisticLoad
+from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
 
 if __name__ == '__main__':
-    psn_path = '../PSNs/prova.graphml'
+    psn_path = '../PSNs/waxman_20_servers.graphml'
     # nx.write_graphml(psn, psn_path)
 
-    create_HADRL_PSN_file(
-        path=psn_path,
-        n_CDCs=5,
-        n_EDCs=15,
-        n_servers_per_DC=(16, 10, 4),
-        n_EDCs_per_CDC=3
-    )
-    exit()
+    # create_HADRL_PSN_file(
+    #     path=psn_path,
+    #     n_CDCs=1,
+    #     n_EDCs=1,
+    #     n_servers_per_DC=(10, 6, 4),
+    #     n_EDCs_per_CDC=1
+    # )
 
     psn = reader.read_psn(psn_path)
 
@@ -38,9 +37,9 @@ if __name__ == '__main__':
     tr_load = 0.9
     tr_time_limit = False
     tr_max_ep_steps = 1000
-    tr_reset_load_class = ResetWithRealisticLoad
+    tr_reset_load_class = ResetWithLoadMixed
     # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    tr_reset_load_kwargs = dict(cpu_load=0.8)
+    tr_reset_load_kwargs = dict(load=0.7)
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=n_tr_envs,
@@ -59,14 +58,14 @@ if __name__ == '__main__':
     )
 
     # evaluation environment
-    n_eval_envs = 10
+    n_eval_envs = 4
     eval_nsprs_per_ep = 1
     eval_load = 0.9
     eval_time_limit = False
     eval_max_ep_steps = 1000
-    eval_reset_load_class = ResetWithRealisticLoad
+    eval_reset_load_class = ResetWithLoadMixed
     # eval_reset_with_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    eval_reset_load_kwargs = dict(cpu_load=0.8)
+    eval_reset_load_kwargs = dict(load=0.7)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -90,22 +89,22 @@ if __name__ == '__main__':
                   'eta': 0.05, 'xi': 1., 'beta': 1.}
     policy = HADRLPolicy
     policy_kwargs = dict(psn=psn,
-                         net_arch=[dict(pi=[256, 128], vf=[256, 128, 32])],
+                         net_arch=[dict(pi=[128], vf=[128, 32])],
                          activation_fn=nn.Tanh,
                          servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                         gcn_layers_dims=(60, 60, 60),
+                         gcn_layers_dims=(20, 20, 20),
                          use_heuristic=use_heuristic,
-                         heu_kwargs=heu_kwargs,)
+                         heu_kwargs=heu_kwargs, )
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
-                learning_rate=0.0001,
+    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+                learning_rate=0.0002,
                 n_steps=1,  # ogni quanti step fare un update
                 gamma=0.99,
                 gae_lambda=0.92,
                 ent_coef=0.01,
                 # max_grad_norm=0.9,
                 use_rms_prop=True,
-                tensorboard_log="../tb_logs/tb_logs_hadrl-topology/",
+                tensorboard_log="../tb_logs/tb_logs_hadrl-policy/",
                 policy_kwargs=policy_kwargs)
 
     # model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
@@ -131,7 +130,7 @@ if __name__ == '__main__':
     print(model.policy)
 
     # define some training hyperparams
-    tot_tr_steps = 40_000_000
+    tot_tr_steps = 30_000_000
 
     if tr_reset_load_class is not None:
         tr_load = tr_reset_load_kwargs.get('cpu_load', None)
@@ -156,7 +155,7 @@ if __name__ == '__main__':
         **heu_kwargs,
     }
     wandb_run = wandb.init(
-        project="HADRL topology",
+        project="ResetWithLoadMixed",
         dir="../",
         # name="Simpler HADRL-style PSN - branch main",
         config=config,

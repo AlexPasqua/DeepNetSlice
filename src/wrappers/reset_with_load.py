@@ -202,9 +202,6 @@ class ResetWithLoadMixed(gym.Wrapper):
             tot_bw_to_remove = self.bw_load * self.tot_bw_cap / max_bw
             # iterate over nodes in a random order and reduce the CPU/RAM availabilities
             nodes = list(psn.nodes.items())
-            # random.shuffle(nodes)
-            # for node_id, node in nodes:
-            n_processed_nodes = 0
             while tot_cpu_to_remove > 0 or tot_ram_to_remove > 0:
                 node_id, node = random.sample(nodes, 1)[0]
                 if node['NodeType'] == 'server':
@@ -228,47 +225,25 @@ class ResetWithLoadMixed(gym.Wrapper):
                     tot_cpu_to_remove -= cur_cpu_to_remove
                     tot_ram_to_remove -= cur_ram_to_remove
 
-                    # from the 2nd node onwards
-                    if n_processed_nodes > 0:
-                        path = nx.shortest_path(G=psn, source=prev_node_id, target=node_id,
-                                                weight=self.compute_link_weight, method='dijkstra')
-                        if len(path) >= 2:
-                            max_requestable_bw = int(tot_bw_to_remove * max_bw / (2 * len(path) - 2))
-                            req_bw = min(self.vl_req_bw, max_requestable_bw)
-                            req_bw_normal = round(req_bw / max_bw, 6)
-                            for j in range(len(path) - 1):
-                                link = psn.edges[path[j], path[j+1]]
-                                extr1_idx = map_id_idx[path[j]]
-                                extr2_idx = map_id_idx[path[j + 1]]
-                                # TODO: req BW by VL = 2000 (hard coded for now)
-                                link['availBW'] -= req_bw
-                                obs_dict['bw_avails'][extr1_idx] -= req_bw_normal
-                                obs_dict['bw_avails'][extr2_idx] -= req_bw_normal
-                                tot_bw_to_remove -= req_bw_normal
-                                if link['availBW'] < 0 or obs_dict['bw_avails'][extr1_idx] < 0 or obs_dict['bw_avails'][extr2_idx] < 0:
-                                    break
-
-                    # save node as previous node
-                    prev_node_id = node_id
-                    n_processed_nodes += 1
-
-            # # iterate over links in random order and reduce the BW availability
-            # links = list(psn.edges.items())
-            # # random.shuffle(links)
-            # # for extremes, link in links:
-            # while tot_bw_to_remove > 0:
-            #     extremes, link = random.sample(links, 1)[0]
-            #     cur_bw_to_remove = np.random.randint(0, link['availBW'], 1)[0]
-            #     cur_bw_to_remove = min(cur_bw_to_remove, tot_bw_to_remove * max_bw)
-            #     cur_bw_to_remove_normal = cur_bw_to_remove / max_bw
-            #     idx_0, idx_1 = map_id_idx[extremes[0]], map_id_idx[extremes[1]]
-            #     # links' BW actually reduced because needed for shortest path calculation
-            #     link['availBW'] -= cur_bw_to_remove
-            #     obs_dict['bw_avails'][idx_0] -= cur_bw_to_remove_normal
-            #     obs_dict['bw_avails'][idx_1] -= cur_bw_to_remove_normal
-            #     tot_bw_to_remove -= cur_bw_to_remove_normal
-
-        return
+            # iterate over links in random order and reduce the BW availability
+            links = list(psn.edges.items())
+            while tot_bw_to_remove > 0:
+                extremes, link = random.sample(links, 1)[0]
+                # TODO: consider to extend as [0.25, 0.5, 0.75, 1.]
+                perc_to_remove = np.random.choice([0.5], 1)[0]
+                # cur_bw_to_remove = np.random.randint(0, link['availBW'] + 1, 1)[0]
+                cur_bw_to_remove = perc_to_remove * link['BWcap']
+                # cur_bw_to_remove = min(cur_bw_to_remove, tot_bw_to_remove * max_bw)
+                idx_0, idx_1 = map_id_idx[extremes[0]], map_id_idx[extremes[1]]
+                cur_bw_to_remove = min([round(cur_bw_to_remove, 6),
+                                        tot_bw_to_remove * max_bw,
+                                        link['availBW']])
+                cur_bw_to_remove_normal = cur_bw_to_remove / max_bw
+                # links' BW actually reduced because needed for shortest path calculation
+                link['availBW'] -= cur_bw_to_remove
+                obs_dict['bw_avails'][idx_0] -= cur_bw_to_remove_normal
+                obs_dict['bw_avails'][idx_1] -= cur_bw_to_remove_normal
+                tot_bw_to_remove -= cur_bw_to_remove_normal
 
 
 class ResetWithLoadBinary(ResetWithLoadMixed):

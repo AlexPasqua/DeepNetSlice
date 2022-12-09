@@ -1,3 +1,5 @@
+import warnings
+
 import gym
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
@@ -33,5 +35,10 @@ class CPULoadCallback(BaseCallback):
                 avg_cpu_avail = np.mean(servers_cpu_avails)
                 loads.append(1. - avg_cpu_avail)
             avg_load = np.mean(loads)
-            self.logger.record("Average CPU load of training envs", avg_load)
+            if self.verbose > 1:
+                print(f"Average CPU load of training envs: {avg_load}")
+            try:
+                self.logger.record("Average CPU load of training envs", avg_load)
+            except AttributeError:
+                warnings.warn("No logger for CPU load callback, data not being logged")
         return True

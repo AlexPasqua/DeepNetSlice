@@ -2,12 +2,13 @@ import numpy as np
 from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 
+from callbacks import CPULoadCallback
 from utils import make_env
 
 if __name__ == '__main__':
     # load model
     model = A2C.load(
-        path="../wandb/run-20221113_204348-sxby78j6/files/model.zip",
+        path="../wandb/run-20221124_154757-m8atvrw5/files/model.zip",
         env=None,
         device='cuda:0',
         print_system_info=True,
@@ -19,23 +20,27 @@ if __name__ == '__main__':
         env_id=make_env,
         n_envs=1,
         env_kwargs=dict(
-            psn_path="../PSNs/hadrl_psn.graphml",
+            psn_path="../PSNs/hadrl_psn_1-10_1-6_1-4.graphml",
             time_limit=True,
             time_limit_kwargs=dict(max_episode_steps=1000),
-            reset_with_load=False,
+            reset_load_class=None,
             hadrl_nsprs=True,
             hadrl_nsprs_kwargs=dict(nsprs_per_ep=None,
                                     load=0.5)
         ),
     )
 
+    cpu_load_callback = CPULoadCallback(env, freq=300, verbose=2)
+    cpu_load_callback.init_callback(model)
+
     # evaluate model
     obs = env.reset()
     accepted = seen = 0.0
     accept_ratio_per_ep = []
     for i in range(10_000):
-        action, _states = model.predict(obs, deterministic=False)
+        action, _states = model.predict(obs, deterministic=True)
         obs, rewards, done, info = env.step(action)
+        cpu_load_callback.on_step()
         # acceptance ratio
         if rewards[0] != 0.0:
             seen += 1

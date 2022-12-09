@@ -265,28 +265,22 @@ class NetworkSimulator(gym.Env):
         placement_state = np.zeros(len(self.psn.nodes), dtype=int)
 
         # scan all nodes and save data in lists
-        self.max_cpu = self.max_ram = self.max_bw = 0
         self.tot_cpu_cap = self.tot_ram_cap = self.tot_bw_cap = 0
         for node_id, node in self.psn.nodes.items():
-            # get nodes' capacities (if routers, set these to 0)
+            self.tot_cpu_cap += node.get('CPUcap', 0)
+            self.tot_ram_cap += node.get('RAMcap', 0)
             cpu_avails[self.map_id_idx[node_id]] = node.get('availCPU', 0)
             ram_avails[self.map_id_idx[node_id]] = node.get('availRAM', 0)
-            tot_bw = 0
-            for extremes, link in self.psn.edges.items():
-                self.tot_bw_cap += link['BWcap']
-                if node_id in extremes:
-                    bw_avails[self.map_id_idx[node_id]] += link['availBW']
-                    tot_bw += link['BWcap']
-            # update the max CPU / RAM / BW capacities
-            if node['NodeType'] == 'server':
-                self.tot_cpu_cap += node['CPUcap']
-                self.tot_ram_cap += node['RAMcap']
-                if node['CPUcap'] > self.max_cpu:
-                    self.max_cpu = node['CPUcap']
-                if node['RAMcap'] > self.max_ram:
-                    self.max_ram = node['RAMcap']
-            if tot_bw > self.max_bw:
-                self.max_bw = tot_bw
+        # scan all links and save data in list
+        for extremes, link in self.psn.edges.items():
+            self.tot_bw_cap += link['BWcap']
+            bw_avails[self.map_id_idx[extremes[0]]] += link['availBW']
+            bw_avails[self.map_id_idx[extremes[1]]] += link['availBW']
+
+        # save max CPU/RAM/BW capacities (= availabilities in empty PSN) of all nodes
+        self.max_cpu = np.max(cpu_avails)
+        self.max_ram = np.max(ram_avails)
+        self.max_bw = np.max(bw_avails)
 
         # normalize the quantities
         cpu_avails /= self.max_cpu
