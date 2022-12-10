@@ -2,7 +2,7 @@ import numpy as np
 from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 
-from callbacks import CPULoadCallback
+from callbacks import PSNLoadCallback
 from utils import make_env
 
 if __name__ == '__main__':
@@ -30,7 +30,7 @@ if __name__ == '__main__':
         ),
     )
 
-    cpu_load_callback = CPULoadCallback(env, freq=300, verbose=2)
+    cpu_load_callback = PSNLoadCallback(env, freq=300, verbose=2)
     cpu_load_callback.init_callback(model)
 
     # evaluate model

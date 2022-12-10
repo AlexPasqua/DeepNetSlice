@@ -135,3 +135,4 @@ dmypy.json
 tb_logs*/
 models*/
 wandb/
+.vscode/
