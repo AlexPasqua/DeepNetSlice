@@ -1,3 +1,4 @@
-from .acceptance_ratio_callbacks import AcceptanceRatioByStepsCallback
+from .acceptance_ratio_callbacks import AcceptanceRatioByStepsCallback, AcceptanceRatioByNSPRsCallback
 from .hparam_callback import HParamCallback
 from .psn_load_callback import PSNLoadCallback
+from .seen_nsprs_callback import SeenNSPRsCallback

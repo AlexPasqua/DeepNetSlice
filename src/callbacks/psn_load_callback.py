@@ -9,9 +9,6 @@ class PSNLoadCallback(BaseCallback):
     """
     Class for logging the load of the PSN.
 
-    NOTE: currently it works correctly only if all the nodes have the same
-    maximum CPU capacity (if some don't have CPU at all it's fine)
-
     :param env: environment
     :param freq: logging frequency (in number of steps)
     :param cpu: if True, track CPU load
@@ -62,7 +59,7 @@ class PSNLoadCallback(BaseCallback):
                 if self.bw:
                     avg_bw_load = np.mean(bw_loads)
                     self.logger.record("Average BW load of training envs", avg_bw_load)
-                if self.verbose > 1:
+                if self.verbose > 0:
                     try:
                         print(f"Average CPU load of training envs: {avg_cpu_load}")
                         print(f"Average RAM load of training envs: {avg_ram_load}")
