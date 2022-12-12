@@ -30,7 +30,7 @@ if __name__ == '__main__':
     psn = reader.read_psn(psn_path)
 
     # training environment
-    n_tr_envs = 2
+    n_tr_envs = 20
     tr_nsprs_per_ep = 1
     tr_load = 0.9
     tr_time_limit = False
@@ -82,9 +82,9 @@ if __name__ == '__main__':
     )
 
     # model definition
-    use_heuristic = False
-    heu_kwargs = {'n_servers_to_sample': 10, 'heu_class': P2CLoadBalanceHeuristic,
-                  'eta': 0.05, 'xi': 1., 'beta': 1.}
+    use_heuristic = True
+    heu_kwargs = {'n_servers_to_sample': 4, 'heu_class': P2CLoadBalanceHeuristic,
+                  'eta': 0.05, 'xi': 0.7, 'beta': 1.}
     policy = HADRLPolicy
     policy_kwargs = dict(psn=psn,
                          net_arch=[dict(pi=[128], vf=[128, 32])],
@@ -96,13 +96,13 @@ if __name__ == '__main__':
 
     model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
                 learning_rate=0.0002,
-                n_steps=2,  # ogni quanti step fare un update
+                n_steps=1,  # ogni quanti step fare un update
                 gamma=0.99,
                 gae_lambda=0.92,
                 ent_coef=0.01,
                 # max_grad_norm=0.9,
                 use_rms_prop=True,
-                tensorboard_log="../tb_logs/",
+                # tensorboard_log="../tb_logs/",
                 policy_kwargs=policy_kwargs)
 
     # model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     print(model.policy)
 
     # define some training hyperparams
-    tot_tr_steps = 30_000_000
+    tot_tr_steps = 20_000_000
 
     if tr_reset_load_class is not None:
         tr_load = tr_reset_load_kwargs.get('cpu_load', None)
@@ -152,14 +152,14 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    wandb_run = wandb.init(
-        project="ResetWithLoadMixed",
-        dir="../",
-        # name="Simpler HADRL-style PSN - branch main",
-        config=config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        save_code=True,  # optional
-    )
+    # wandb_run = wandb.init(
+    #     project="Heuristic",
+    #     dir="../",
+    #     # name="Simpler HADRL-style PSN - branch main",
+    #     config=config,
+    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    #     save_code=True,  # optional
+    # )
 
     # training callbacks
     list_of_callbacks = [
@@ -177,9 +177,9 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-                      verbose=2,
-                      model_save_freq=10_000),
+        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+        #               verbose=2,
+        #               model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
                      eval_freq=5_000, deterministic=True, verbose=2,
@@ -192,7 +192,7 @@ if __name__ == '__main__':
 
         PSNLoadCallback(env=tr_env, freq=50, verbose=1),
 
-        SeenNSPRsCallback(env=tr_env, freq=10, verbose=1),
+        SeenNSPRsCallback(env=tr_env, freq=50, verbose=1),
     ]
 
     # model training
@@ -201,4 +201,4 @@ if __name__ == '__main__':
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    wandb_run.finish()
+    # wandb_run.finish()

@@ -1,5 +1,5 @@
 import warnings
-
+from queue import Queue
 import gym
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
@@ -94,39 +94,60 @@ class AcceptanceRatioByNSPRsCallback(BaseCallback):
             self,
             env: gym.Env,
             name: str = "Acceptance ratio",
-            nsprs_per_tr_phase: int = 1,
+            nsprs_per_tr_phase: int = 1000,
             verbose=0
     ):
         super().__init__(verbose)
         self.env = env
         self.name = name
         self.nsprs_per_tr_phase = nsprs_per_tr_phase
-        self.seen_to_subtract = 0
-        self.accepted_to_subtract = 0
-        self.last_seen = 0
+        # num of seen NSPRs to subtract form the total number of seen NSPRs (per env)
+        self.seen_to_subtract = [0] * env.num_envs
+        # num of accepted NSPRs to subtract form the total number of accepted NSPRs (per env)
+        self.accepted_to_subtract = [0] * env.num_envs
+        # num of seen NSPRs last considered for logging (per env),
+        # used to ensure it loggs once per training phase
+        self.last_seen = [0] * env.num_envs
+        # num of accepted NSPRs during this training phase (per env)
+        self.accepted_this_training_phase = [0] * env.num_envs
+        # num of NSPRs seen during this training phase (per env)
+        self.seen_this_training_phase = [0] * env.num_envs
+        # acceptance ratio of each env
+        self.acceptance_ratios = [Queue() for _ in range(env.num_envs)]
+        # once an env is ready for logging, its cell is increased by 1,
+        # and it is decreased by 1 when the acceptance ratio is logged
+        self.ready_envs = np.zeros(shape=env.num_envs, dtype=int)
         if isinstance(self.env, VecEnv) and self.env.num_envs > 1:
             warnings.warn("The env is vectorized, only the first env instance "
                           "will be used for the acceptance ratio by NSPRs.")
 
     def _on_step(self) -> bool:
         if isinstance(self.env, VecEnv):
-            seen_nsprs = self.env.get_attr('tot_seen_nsprs', 0)[0]
-            accepted_nsprs = self.env.get_attr('accepted_nsprs', 0)[0]
+            seen_nsprs = self.env.get_attr('tot_seen_nsprs')
+            accepted_nsprs = self.env.get_attr('accepted_nsprs')
         else:
-            seen_nsprs = self.env.tot_seen_nsprs
-            accepted_nsprs = self.env.accepted_nsprs
-        if seen_nsprs > self.last_seen and seen_nsprs % self.nsprs_per_tr_phase == 0:
-            self.last_seen = seen_nsprs
-            # NSPRs seen and accepted in this training phase
-            seen_this_tr_phase = seen_nsprs - self.seen_to_subtract
-            accepted_this_tr_phase = accepted_nsprs - self.accepted_to_subtract
-            # update how much to subtract to get the quantities for next tr phase
-            self.seen_to_subtract = seen_nsprs
-            self.accepted_to_subtract = accepted_nsprs
-            # compute acceptance ratio
-            try:
-                accept_ratio = accepted_this_tr_phase / seen_this_tr_phase
-            except ZeroDivisionError:
-                accept_ratio = 0.
-            self.logger.record(self.name, accept_ratio)
+            seen_nsprs = [self.env.tot_seen_nsprs]
+            accepted_nsprs = [self.env.accepted_nsprs]
+        
+        for env_idx in range(self.env.num_envs):
+            if seen_nsprs[env_idx] > self.last_seen[env_idx] and seen_nsprs[env_idx] % self.nsprs_per_tr_phase == 0:
+                self.ready_envs[env_idx] += 1
+                self.last_seen[env_idx] = seen_nsprs[env_idx]
+                # NSPRs seen and accepted in this training phase
+                seen_this_tr_phase = seen_nsprs[env_idx] - self.seen_to_subtract[env_idx]
+                accepted_this_tr_phase = accepted_nsprs[env_idx] - self.accepted_to_subtract[env_idx]
+                # update how much to subtract to get the quantities for next tr phase
+                self.seen_to_subtract[env_idx] = seen_nsprs[env_idx]
+                self.accepted_to_subtract[env_idx] = accepted_nsprs[env_idx]
+                # compute acceptance ratio
+                try:
+                    self.acceptance_ratios[env_idx].put(accepted_this_tr_phase / seen_this_tr_phase)
+                except ZeroDivisionError:
+                    self.acceptance_ratios[env_idx].put(0.)
+        
+        if all(self.ready_envs):
+            ratios = [self.acceptance_ratios[env_idx].get() for env_idx in range(self.env.num_envs)]
+            self.logger.record(self.name, np.mean(ratios))
+            self.ready_envs -= 1
+        
         return True
