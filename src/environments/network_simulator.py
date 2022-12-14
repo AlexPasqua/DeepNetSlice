@@ -415,6 +415,7 @@ class NetworkSimulator(gym.Env):
                 return obs, reward, self.done, info
 
             # update acceptance reward and tr_load balancing reward
+            idx = self.map_id_idx[physical_node_id]
             self._acceptance_rewards.append(self.rval_accepted_vnf)
             self._load_balance_rewards.append(
                 self.obs_dict['cpu_avails'][idx] * self.max_cpu / physical_node['CPUcap'] +
@@ -423,7 +424,6 @@ class NetworkSimulator(gym.Env):
 
             # update the resources availabilities of the physical node in the obs dict
             self.cur_vnf['placed'] = physical_node_id
-            idx = self.map_id_idx[physical_node_id]
             self.obs_dict['cpu_avails'][idx] -= self.cur_vnf['reqCPU'] / self.max_cpu
             self.obs_dict['ram_avails'][idx] -= self.cur_vnf['reqRAM'] / self.max_ram
             self.obs_dict['placement_state'][idx] += 1

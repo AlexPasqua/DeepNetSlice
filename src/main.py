@@ -45,7 +45,7 @@ if __name__ == '__main__':
     tr_max_ep_steps = 1000
     tr_reset_load_class = ResetWithRealisticLoad
     # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    tr_reset_load_kwargs = dict(cpu_load=0.7)
+    tr_reset_load_kwargs = dict(cpu_load=0.5)
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=n_tr_envs,
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     eval_max_ep_steps = 1000
     eval_reset_load_class = ResetWithRealisticLoad
     # eval_reset_with_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    eval_reset_load_kwargs = dict(cpu_load=0.7)
+    eval_reset_load_kwargs = dict(cpu_load=0.5)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -90,27 +90,27 @@ if __name__ == '__main__':
     )
 
     # model definition
-    use_heuristic = True
+    use_heuristic = False
     heu_kwargs = {'n_servers_to_sample': 4, 'heu_class': P2CLoadBalanceHeuristic,
                   'eta': 0.05, 'xi': 0.7, 'beta': 1.}
     policy = HADRLPolicy
     policy_kwargs = dict(psn=psn,
-                         net_arch=[dict(pi=[128], vf=[128, 32])],
+                         net_arch=[dict(pi=[256, 128], vf=[256, 128, 32])],
                          activation_fn=nn.Tanh,
                          servers_map_idx_id=tr_env.get_attr('servers_map_idx_id', 0)[0],
-                         gcn_layers_dims=(20, 20, 20),
+                         gcn_layers_dims=(60, 60, 60),
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs, )
 
     model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
-                learning_rate=0.0002,
+                learning_rate=0.0001,
                 n_steps=1,  # ogni quanti step fare un update
                 gamma=0.99,
                 gae_lambda=0.92,
                 ent_coef=0.01,
                 # max_grad_norm=0.9,
                 use_rms_prop=True,
-                # tensorboard_log="../tb_logs/",
+                tensorboard_log="../tb_logs/",
                 policy_kwargs=policy_kwargs)
 
     # model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     print(model.policy)
 
     # define some training hyperparams
-    tot_tr_steps = 20_000_000
+    tot_tr_steps = 50_000_000
 
     if tr_reset_load_class is not None:
         tr_load = tr_reset_load_kwargs.get('cpu_load', None)
@@ -160,14 +160,14 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    # wandb_run = wandb.init(
-    #     project="Heuristic",
-    #     dir="../",
-    #     # name="Simpler HADRL-style PSN - branch main",
-    #     config=config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     save_code=True,  # optional
-    # )
+    wandb_run = wandb.init(
+        project="ACTUAL EXPERIMENTS - results replication",
+        dir="../",
+        name="load = 0.5",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        save_code=True,  # optional
+    )
 
     # training callbacks
     list_of_callbacks = [
@@ -185,9 +185,9 @@ if __name__ == '__main__':
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-        #               verbose=2,
-        #               model_save_freq=10_000),
+        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+                      verbose=2,
+                      model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
                      eval_freq=5_000, deterministic=True, verbose=2,
@@ -198,9 +198,9 @@ if __name__ == '__main__':
                          verbose=2
                      )),
 
-        PSNLoadCallback(env=tr_env, freq=50, verbose=1),
+        PSNLoadCallback(env=tr_env, freq=500, verbose=1),
 
-        SeenNSPRsCallback(env=tr_env, freq=50, verbose=1),
+        SeenNSPRsCallback(env=tr_env, freq=100, verbose=1),
     ]
 
     # model training
@@ -209,4 +209,4 @@ if __name__ == '__main__':
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    # wandb_run.finish()
+    wandb_run.finish()
