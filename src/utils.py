@@ -352,14 +352,14 @@ def _create_HEENSO_links(
         corresp_CCP = np.random.randint(0, n_CCPs)
         g.add_edge(CDCs_routers[i], CCPs_switches[corresp_CCP], BWcap=outer_DC_bw_cap)
 
-    # connect each CDCs' router to n EDCs' routers
+    # connect each CDCs' switch to n EDCs' routers
     for i in range(n_CDCs):
         if connect_CDCs_EDCs_randomly:
             corresp_EDCs = np.random.choice(n_EDCs, n_EDCs_per_CDC, replace=False)
         else:
-            corresp_EDCs = list(range(n_EDCs_per_CDC * i, n_EDCs * i + n_EDCs_per_CDC))
+            corresp_EDCs = list(range(n_EDCs_per_CDC * i, n_EDCs_per_CDC * i + n_EDCs_per_CDC))
         for j in range(n_EDCs_per_CDC):
-            g.add_edge(CDCs_routers[i], EDCs_routers[corresp_EDCs[j]],
+            g.add_edge(CDCs_switches[i], EDCs_routers[corresp_EDCs[j]],
                        BWcap=outer_DC_bw_cap)
 
     # connect CDCs routers in a circular way (like in Fig. 4 in HEENSO paper)

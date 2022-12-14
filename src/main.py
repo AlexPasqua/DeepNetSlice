@@ -12,12 +12,11 @@ from callbacks import PSNLoadCallback, HParamCallback, AcceptanceRatioByNSPRsCal
 from heuristic_layers import P2CLoadBalanceHeuristic
 from policies.features_extractors import HADRLFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
-from utils import make_env, create_HADRL_PSN_file
+from utils import make_env, create_HADRL_PSN_file, create_HEENSO_PSN_file
 from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
 
 if __name__ == '__main__':
-    psn_path = '../PSNs/waxman_20_servers.graphml'
-    # nx.write_graphml(psn, psn_path)
+    psn_path = "../PSNs/heenso_1-16_5-10_15-4_.graphml"
 
     # create_HADRL_PSN_file(
     #     path=psn_path,
@@ -25,6 +24,15 @@ if __name__ == '__main__':
     #     n_EDCs=1,
     #     n_servers_per_DC=(10, 6, 4),
     #     n_EDCs_per_CDC=1
+    # )
+
+    # create_HEENSO_PSN_file(
+    #     path=psn_path,
+    #     n_CCPs=1,
+    #     n_CDCs=5,
+    #     n_EDCs=15,
+    #     n_servers_per_DC=(16, 10, 4),
+    #     n_EDCs_per_CDC=3
     # )
 
     psn = reader.read_psn(psn_path)
