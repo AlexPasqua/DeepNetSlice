@@ -16,7 +16,7 @@ from utils import make_env, create_HADRL_PSN_file, create_HEENSO_PSN_file
 from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
 
 if __name__ == '__main__':
-    psn_path = "../PSNs/heenso_1-16_5-10_15-4_.graphml"
+    psn_path = "../PSNs/heenso_1-16_5-10_15-4.graphml"
 
     # create_HADRL_PSN_file(
     #     path=psn_path,
