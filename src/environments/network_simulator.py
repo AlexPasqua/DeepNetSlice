@@ -414,22 +414,19 @@ class NetworkSimulator(gym.Env):
                 obs, reward = self.manage_unsuccessful_action()
                 return obs, reward, self.done, info
 
+            # update acceptance reward and tr_load balancing reward
+            self._acceptance_rewards.append(self.rval_accepted_vnf)
+            self._load_balance_rewards.append(
+                self.obs_dict['cpu_avails'][idx] * self.max_cpu / physical_node['CPUcap'] +
+                self.obs_dict['ram_avails'][idx] * self.max_ram / physical_node['RAMcap']
+            )
+
             # update the resources availabilities of the physical node in the obs dict
             self.cur_vnf['placed'] = physical_node_id
             idx = self.map_id_idx[physical_node_id]
             self.obs_dict['cpu_avails'][idx] -= self.cur_vnf['reqCPU'] / self.max_cpu
             self.obs_dict['ram_avails'][idx] -= self.cur_vnf['reqRAM'] / self.max_ram
             self.obs_dict['placement_state'][idx] += 1
-
-            # update acceptance reward and tr_load balancing reward
-            self._acceptance_rewards.append(self.rval_accepted_vnf)
-            self._load_balance_rewards.append(
-                self.obs_dict['cpu_avails'][idx] * self.max_cpu / physical_node['CPUcap'] +
-                self.obs_dict['ram_avails'][idx] * self.max_ram / physical_node['RAMcap'] +
-
-                # TODO: this is not included in HADRL, but it's to prevent zero reward for successful placements
-                0.1
-            )
 
             # connect the placed VNF to the other VNFs it's supposed to be connected to
             cur_vnf_VLs = self.get_cur_vnf_vls(self.cur_vnf_id, self.cur_nspr)
