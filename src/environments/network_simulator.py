@@ -74,10 +74,10 @@ class NetworkSimulator(gym.Env):
         self.action_space = gym.spaces.Discrete(len(servers_ids))
         self.observation_space = gym.spaces.Dict({
             # PSN STATE
-            'cpu_avails': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
-            'ram_avails': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'cpu_avails': gym.spaces.Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
+            'ram_avails': gym.spaces.Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
             # for each physical node, sum of the BW of the physical links connected to it
-            'bw_avails': gym.spaces.Box(low=0, high=math.inf, shape=(n_nodes,), dtype=np.float32),
+            'bw_avails': gym.spaces.Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
             # for each physical node, number of VNFs of the current NSPR placed on it
             'placement_state': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
 
@@ -320,21 +320,21 @@ class NetworkSimulator(gym.Env):
             cur_vnf_vls = self.get_cur_vnf_vls(vnf_id=self.cur_vnf_id,
                                                nspr=self.cur_nspr)
             cur_vnf_cpu_req = np.array(
-                [self.cur_vnf['reqCPU'] / self.max_cpu], dtype=float)
+                [self.cur_vnf['reqCPU'] / self.max_cpu], dtype=np.float32)
 
             cur_vnf_ram_req = np.array(
-                [self.cur_vnf['reqRAM'] / self.max_ram], dtype=float)
+                [self.cur_vnf['reqRAM'] / self.max_ram], dtype=np.float32)
 
             cur_vnf_bw_req = np.array(
                 [sum([vl['reqBW'] for vl in cur_vnf_vls.values()]) / self.max_bw],
-                dtype=float)
+                dtype=np.float32)
 
             vnfs_still_to_place = np.array(
                 [len(self.cur_nspr_unplaced_vnfs_ids) + 1], dtype=int)
         else:
-            cur_vnf_cpu_req = np.array([0], dtype=float)
-            cur_vnf_ram_req = np.array([0], dtype=float)
-            cur_vnf_bw_req = np.array([0], dtype=float)
+            cur_vnf_cpu_req = np.array([0], dtype=np.float32)
+            cur_vnf_ram_req = np.array([0], dtype=np.float32)
+            cur_vnf_bw_req = np.array([0], dtype=np.float32)
             vnfs_still_to_place = np.array([0], dtype=int)
 
         self.obs_dict['cur_vnf_cpu_req'] = cur_vnf_cpu_req
@@ -525,9 +525,10 @@ class NetworkSimulator(gym.Env):
         self.time_step += 1
 
         # check for new and departing NSPRs
-        self.check_for_departed_nsprs()
-        self.waiting_nsprs += self.nsprs.get(self.time_step, [])
-        self.pick_next_nspr()
+        if self.nsprs is not None:
+            self.check_for_departed_nsprs()
+            self.waiting_nsprs += self.nsprs.get(self.time_step, [])
+            self.pick_next_nspr()
 
         # new observation
         obs = self.update_nspr_state()

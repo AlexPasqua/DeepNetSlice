@@ -6,6 +6,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
 from wandb.integration.sb3 import WandbCallback
+from gym.utils.env_checker import check_env
 
 import reader
 from callbacks import PSNLoadCallback, HParamCallback, AcceptanceRatioByNSPRsCallback, SeenNSPRsCallback

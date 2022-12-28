@@ -4,6 +4,7 @@ import gym
 import networkx as nx
 import numpy as np
 
+from gym.utils.env_checker import check_env
 from environments.network_simulator import NetworkSimulator
 from wrappers import ResetWithRandLoad, NSPRsGeneratorHADRL
 from wrappers.reset_with_load import ResetWithLoadMixed, ResetWithLoadBinary, ResetWithRealisticLoad
@@ -46,6 +47,7 @@ def make_env(
         env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
     if reset_load_class is not None:
         env = reset_load_class(env, **reset_load_kwargs)
+    check_env(env)
     return env
 
 
