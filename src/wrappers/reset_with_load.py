@@ -366,6 +366,10 @@ class ResetWithRealisticLoad(gym.Wrapper):
                                         target=dst_node_id, weight=self.compute_links_weights,
                                         method='dijkstra')
                 for i in range(len(path) - 1):
+                    # if this VL exceeds the bandwidth available, don't place it, it's okù
+                    # it can happen when there is no available path
+                    if self.env.psn.edges[path[i], path[i+1]]['availBW'] - vl['reqBW'] < 0:
+                        continue
                     self.env.psn.edges[path[i], path[i+1]]['availBW'] -= vl['reqBW']
                     idx1 = self.env.map_id_idx[path[i]]
                     idx2 = self.env.map_id_idx[path[i+1]]
