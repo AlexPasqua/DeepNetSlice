@@ -14,6 +14,7 @@ class HParamCallback(BaseCallback):
             eval_psn_load: float = None,
             eval_max_ep_steps: int = None,
             vnfs_per_nsprs: int = None,
+            use_placement_state: bool = None,
             use_heuristic: bool = False,
             heu_kwargs: dict = None,
     ):
@@ -33,6 +34,7 @@ class HParamCallback(BaseCallback):
         self.eval_psn_load = eval_psn_load
         self.eval_max_ep_steps = eval_max_ep_steps
         self.vnfs_per_nspr = vnfs_per_nsprs
+        self.use_placement_state = use_placement_state,
         self.use_heuristic = use_heuristic
         self.heu_kwargs = heu_kwargs if heu_kwargs is not None else {}
         if 'heu_class' in self.heu_kwargs:
@@ -62,6 +64,7 @@ class HParamCallback(BaseCallback):
             "max steps per eval episode": self.eval_max_ep_steps,
             "VNFs/NSPR": self.vnfs_per_nspr,
             "GCN layers dimensions": gcn_layers_dims,
+            "Use placement state": str(self.use_placement_state),
             "Use heuristic": self.use_heuristic,
             "Heuristic class": self.heu_class,
             "heu's num sampled servers": self.heu_kwargs.get("n_servers_to_sample", None),

@@ -5,8 +5,8 @@ import networkx as nx
 import numpy as np
 
 from gym.utils.env_checker import check_env
-from environments.network_simulator import NetworkSimulator
-from wrappers import ResetWithRandLoad, NSPRsGeneratorHADRL
+from network_simulator import NetworkSimulator
+from wrappers import ResetWithRandLoad, NSPRsGeneratorHADRL, RemovePlacementState
 from wrappers.reset_with_load import ResetWithLoadMixed, ResetWithLoadBinary, ResetWithRealisticLoad
 
 
@@ -19,6 +19,7 @@ def make_env(
         reset_load_kwargs: Optional[dict] = None,
         hadrl_nsprs: bool = False,
         hadrl_nsprs_kwargs: Optional[dict] = None,
+        placement_state: bool = True,
 ):
     """ Create the environment.
     It can be wrapped with different wrappers, all with their own arguments.
@@ -32,6 +33,7 @@ def make_env(
     :param reset_load_kwargs: kwargs for the reset-with-load wrapper
     :param hadrl_nsprs: if True, the env is wrapped with NSPRsGeneratorHADRL wrapper
     :param hadrl_nsprs_kwargs: kwargs for the NSPRsGeneratorHADRL wrapper
+    :param placement_state: if False, adds a wrapper that removes the placement state from the observations
     """
     base_env_kwargs = {} if base_env_kwargs is None else base_env_kwargs
     time_limit_kwargs = {} if time_limit_kwargs is None else time_limit_kwargs
@@ -47,6 +49,8 @@ def make_env(
         env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
     if reset_load_class is not None:
         env = reset_load_class(env, **reset_load_kwargs)
+    if not placement_state:
+        env = RemovePlacementState(env)
     check_env(env)
     return env
 

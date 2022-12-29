@@ -17,7 +17,7 @@ from utils import make_env, create_HADRL_PSN_file, create_HEENSO_PSN_file
 from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
 
 if __name__ == '__main__':
-    psn_path = "../PSNs/heenso_1-16_5-10_15-4.graphml"
+    psn_path = "../PSNs/hadrl_1-16_5-10_15-4.graphml"
 
     # create_HADRL_PSN_file(
     #     path=psn_path,
@@ -46,7 +46,8 @@ if __name__ == '__main__':
     tr_max_ep_steps = 1000
     tr_reset_load_class = ResetWithRealisticLoad
     # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    tr_reset_load_kwargs = dict(cpu_load=0.5)
+    tr_reset_load_kwargs = dict(cpu_load=0.8)
+    placement_state = True
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=n_tr_envs,
@@ -60,8 +61,10 @@ if __name__ == '__main__':
                                     load=tr_load,
                                     always_one=True),
             reset_load_class=tr_reset_load_class,
-            reset_load_kwargs=tr_reset_load_kwargs
+            reset_load_kwargs=tr_reset_load_kwargs,
+            placement_state=placement_state
         ),
+        seed=12,
     )
 
     # evaluation environment
@@ -72,7 +75,7 @@ if __name__ == '__main__':
     eval_max_ep_steps = 1000
     eval_reset_load_class = ResetWithRealisticLoad
     # eval_reset_with_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    eval_reset_load_kwargs = dict(cpu_load=0.5)
+    eval_reset_load_kwargs = dict(cpu_load=0.8)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -86,8 +89,10 @@ if __name__ == '__main__':
             hadrl_nsprs_kwargs=dict(nsprs_per_ep=eval_nsprs_per_ep,
                                     vnfs_per_nspr=5,
                                     load=eval_load,
-                                    always_one=True)
+                                    always_one=True),
+            placement_state=placement_state,
         ),
+        seed=12,
     )
 
     # model definition
@@ -103,7 +108,7 @@ if __name__ == '__main__':
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs, )
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
                 learning_rate=0.0001,
                 n_steps=1,  # ogni quanti step fare un update
                 gamma=0.99,
@@ -158,13 +163,14 @@ if __name__ == '__main__':
         "PSN load (eval)": eval_load,
         "GCNs layers dims": policy_kwargs['gcn_layers_dims'],
         "mpl_extractor arch": policy_kwargs["net_arch"],
+        "use placement state": placement_state,
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
     wandb_run = wandb.init(
-        project="ACTUAL EXPERIMENTS - results replication",
+        project="No placement state",
         dir="../",
-        name="load = 0.5",
+        name="YES placement state",
         config=config,
         sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
         save_code=True,  # optional
@@ -184,6 +190,7 @@ if __name__ == '__main__':
                        eval_nsprs_per_ep=eval_nsprs_per_ep,
                        eval_psn_load=eval_load,
                        eval_max_ep_steps=eval_max_ep_steps if eval_time_limit else None,
+                       use_placement_state=placement_state,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
         WandbCallback(model_save_path=f"../models/{wandb_run.id}",

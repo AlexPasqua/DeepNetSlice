@@ -6,6 +6,8 @@ import gym
 import networkx as nx
 import numpy as np
 
+from gym.spaces import Dict, Box, Discrete
+
 import reader
 
 GymObs = Union[Tuple, dict, np.ndarray, int]
@@ -68,26 +70,26 @@ class NetworkSimulator(gym.Env):
         self.rval_rejected_vnf = -100
 
         # Action space and observation space (gym.Env required attributes)
-        ONE_BILLION = 1000000000  # constant for readability
+        ONE_BILLION = 1_000_000_000  # constant for readability
         n_nodes = len(self.psn.nodes)
         # action space = number of servers
-        self.action_space = gym.spaces.Discrete(len(servers_ids))
-        self.observation_space = gym.spaces.Dict({
+        self.action_space = Discrete(len(servers_ids))
+        self.observation_space = Dict({
             # PSN STATE
-            'cpu_avails': gym.spaces.Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
-            'ram_avails': gym.spaces.Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
+            'cpu_avails': Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
+            'ram_avails': Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
             # for each physical node, sum of the BW of the physical links connected to it
-            'bw_avails': gym.spaces.Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
+            'bw_avails': Box(low=0., high=1., shape=(n_nodes,), dtype=np.float32),
             # for each physical node, number of VNFs of the current NSPR placed on it
-            'placement_state': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
+            'placement_state': Box(low=0, high=ONE_BILLION, shape=(n_nodes,), dtype=int),
 
             # NSPR STATE
             # note: apparently it's not possible to pass "math.inf" or "sys.maxsize" as a gym.spaces.Box's high value
-            'cur_vnf_cpu_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
-            'cur_vnf_ram_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
+            'cur_vnf_cpu_req': Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
+            'cur_vnf_ram_req': Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
             # sum of the required BW of each VL connected to the current VNF
-            'cur_vnf_bw_req': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
-            'vnfs_still_to_place': gym.spaces.Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
+            'cur_vnf_bw_req': Box(low=0, high=ONE_BILLION, shape=(1,), dtype=np.float32),
+            'vnfs_still_to_place': Box(low=0, high=ONE_BILLION, shape=(1,), dtype=int),
         })
         self._empty_psn_obs_dict = None     # used to store the observation resulting from an empty PSN
         self.obs_dict = self._init_obs_dict()     # used to store the current observation

@@ -39,19 +39,22 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         gcn_out_channels = gcn_layers_dims[-1]
         features_dim = gcn_out_channels * self.n_nodes + nspr_out_features
         super().__init__(observation_space, features_dim=features_dim)
-        self.n_features = 4  # same value both for PSN and NSPR states, since they are both 4-dimensional
+        
+        self.psn_state_features = 4 if 'placement_state' in observation_space.spaces else 3
+        self.nspr_state_features = 4
+        
         edges = th.tensor(np.array(psn.edges).reshape((len(psn.edges), 2)),
                           dtype=th.long)
         double_edges = th.cat((edges, th.flip(edges, dims=(1,))))
         self.edge_index = double_edges.t().contiguous()
 
         # GCN layers
-        gcn_layers_dims = [nspr_out_features] + list(gcn_layers_dims)
+        gcn_layers_dims = [self.psn_state_features] + list(gcn_layers_dims)
         self.gcn_layers = nn.ModuleList()
         for i in range(len(gcn_layers_dims) - 1):
             self.gcn_layers.append(GCNConv(gcn_layers_dims[i], gcn_layers_dims[i + 1]))
 
-        self.nspr_fc = Linear(in_features=self.n_features,
+        self.nspr_fc = Linear(in_features=self.nspr_state_features,
                               out_features=nspr_out_features)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
@@ -66,12 +69,13 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
 
         # features extraction of the PSN state
         psn_state = th.empty(
-            size=(len_rollout_buffer, self.n_nodes, self.n_features),
+            size=(len_rollout_buffer, self.n_nodes, self.psn_state_features),
             dtype=th.float, device=device)
         psn_state[:, :, 0] = observations['cpu_avails']
         psn_state[:, :, 1] = observations['ram_avails']
         psn_state[:, :, 2] = observations['bw_avails']
-        psn_state[:, :, 3] = observations['placement_state']
+        if 'placement_state' in observations:
+            psn_state[:, :, 3] = observations['placement_state']
 
         # pass the psn_state through the GCN layers
         gcn_out = psn_state
@@ -81,7 +85,7 @@ class HADRLFeaturesExtractor(BaseFeaturesExtractor):
         gcn_out = gcn_out.flatten(start_dim=1)
 
         # features extraction of the NSPR state
-        nspr_state = th.empty(size=(len_rollout_buffer, 1, self.n_features),
+        nspr_state = th.empty(size=(len_rollout_buffer, 1, self.nspr_state_features),
                               dtype=th.float, device=device)
         nspr_state[:, :, 0] = observations['cur_vnf_cpu_req']
         nspr_state[:, :, 1] = observations['cur_vnf_ram_req']
