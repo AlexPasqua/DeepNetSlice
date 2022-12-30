@@ -22,13 +22,17 @@ class NetworkSimulator(gym.Env):
             nsprs_path: str = "../NSPRs/",
             nsprs_per_episode: int = None,
             nsprs_max_duration: int = 100,
-
+            accumulate_reward: bool = True,
+            discount_acc_rew: bool = True,
     ):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
         :param nsprs_path: either directory with the GraphML files defining the NSPRs or path to a single GraphML file
         :param nsprs_per_episode: max number of NSPRs to be evaluated in each episode. If None, there is no limit.
         :param nsprs_max_duration: (optional) max duration of the NSPRs.
+        :param accumulate_reward: if true, the reward is accumulated and given to the agent only after each NSPRs
+        :param discount_acc_rew: if true, an increasing discount factor is applied to the acceptance reward during each NSPR.
+            It starts from the inverse of the number of VNFs in the NSPR and grows to 1.
         """
         super(NetworkSimulator, self).__init__()
 
@@ -36,6 +40,7 @@ class NetworkSimulator(gym.Env):
         self.psn = reader.read_psn(graphml_file=psn_file)  # physical substrate network
         self.nsprs_path = nsprs_path
         self.nsprs_per_episode = nsprs_per_episode
+        self.accumulate_reward = accumulate_reward
         self.nsprs_seen_in_cur_ep = 0
         self.nsprs_max_duration = nsprs_max_duration
         self.done = False
@@ -49,6 +54,9 @@ class NetworkSimulator(gym.Env):
         self.ep_number = 0  # keep track of current episode number
         self.tot_seen_nsprs = 0  # keep track of the number of NSPRs seen so far
         self.accepted_nsprs = 0  # for the overall acceptance ratio
+        self.discount_acc_rew = discount_acc_rew    # whether or not to discount the acceptance reward
+        self.acc_rew_disc_fact = 1.     # current discount factor for the acceptance reward
+        self.base_acc_rew_disc_fact = 1.    # base discount factor for the acceptance reward
 
         # map (dict) between IDs of PSN's nodes and their respective index (see self._init_map_id_idx's docstring)
         nodes_ids = list(self.psn.nodes.keys())
@@ -155,6 +163,9 @@ class NetworkSimulator(gym.Env):
             self.cur_nspr.graph['DepartureTime'] = self.time_step + self.cur_nspr.graph['duration']
             self.cur_nspr_unplaced_vnfs_ids = list(self.cur_nspr.nodes.keys())
             self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
+            # reset acceptance reward discount factor
+            self.base_acc_rew_disc_fact = 1 / len(self.cur_nspr.nodes)
+            self.acc_rew_disc_fact = 0.
             # self.tot_seen_nsprs += 1
             _ = self.update_nspr_state()    # obs_dict updated within method
 
@@ -205,8 +216,8 @@ class NetworkSimulator(gym.Env):
         self.time_step += 1
         return obs, reward
 
-    def _normal_reward_as_hadrl(self, reward):
-        """ Normalize the reward to be in [0, 10] (as they do in HA-DRL) """
+    def _normalize_reward_0_10(self, reward):
+        """ Normalize the reward to be in [0, 10] (as in HA-DRL) """
         # since the global reward is given by the sum for each time step of the
         # current NSPR (i.e. for each VNF in the NSPR) of the product of the 3
         # partial rewards at time t,
@@ -495,14 +506,20 @@ class NetworkSimulator(gym.Env):
             # save the ID of the next VNF
             if self.cur_nspr_unplaced_vnfs_ids:
                 self.cur_vnf_id = self.cur_nspr_unplaced_vnfs_ids.pop(0)
-                reward = 0  # global reward is non-zero only after the whole NSPR is placed
-
-                # # TODO: different reward than HADRL (experiment)
-                # reward = self._acceptance_rewards[-1] * \
-                #          self._load_balance_rewards[-1] * \
-                #          self._resource_consumption_rewards[-1] / len(self.cur_nspr.nodes) / \
-                #          10.    # che se no a volte ci sono reward globali più basse di alcune reward parziali
-                # reward = self._normal_reward_as_hadrl(reward)
+                if self.accumulate_reward:
+                    reward = 0  # global reward is non-zero only after the whole NSPR is placed (as HADRL)
+                else:
+                    # eventual discount factor of the acceptance reward
+                    if self.discount_acc_rew:
+                        self.acc_rew_disc_fact += self.base_acc_rew_disc_fact
+                    else:
+                        self.acc_rew_disc_fact = 1.
+                    # reward always givent to the agent
+                    reward = self._acceptance_rewards[-1] * self.acc_rew_disc_fact * \
+                             self._load_balance_rewards[-1] * \
+                             self._resource_consumption_rewards[-1] / len(self.cur_nspr.nodes) / \
+                             10.    # scaling factor
+                reward = self._normalize_reward_0_10(reward)
             else:
                 # it means we finished the VNFs of the current NSPR
                 self.nsprs_seen_in_cur_ep += 1
@@ -516,7 +533,7 @@ class NetworkSimulator(gym.Env):
                                    self._resource_consumption_rewards,
                                    self._load_balance_rewards)).prod(axis=0).sum()
                 # normalize the reward to be in [0, 10] (as they do in HA-DRL)
-                reward = self._normal_reward_as_hadrl(reward) * \
+                reward = self._normalize_reward_0_10(reward) * \
                          2  # TODO: per dargli più peso (non da HADRL)
                 self.reset_partial_rewards()
                 self.cur_nspr = None    # marked as None so a new one can be picked

@@ -48,18 +48,26 @@ if __name__ == '__main__':
     # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
     tr_reset_load_kwargs = dict(cpu_load=0.8)
     placement_state = True
+    accumulate_reward = False
+    discount_acc_rew = True
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=n_tr_envs,
         env_kwargs=dict(
             psn_path=psn_path,
+            base_env_kwargs=dict(
+                accumulate_reward=accumulate_reward,
+                discount_acc_rew=discount_acc_rew,
+            ),
             time_limit=tr_time_limit,
             time_limit_kwargs=dict(max_episode_steps=tr_max_ep_steps),
             hadrl_nsprs=True,
-            hadrl_nsprs_kwargs=dict(nsprs_per_ep=tr_nsprs_per_ep,
-                                    vnfs_per_nspr=5,
-                                    load=tr_load,
-                                    always_one=True),
+            hadrl_nsprs_kwargs=dict(
+                nsprs_per_ep=tr_nsprs_per_ep,
+                vnfs_per_nspr=5,
+                load=tr_load,
+                always_one=True
+            ),
             reset_load_class=tr_reset_load_class,
             reset_load_kwargs=tr_reset_load_kwargs,
             placement_state=placement_state
@@ -81,15 +89,21 @@ if __name__ == '__main__':
         n_envs=n_eval_envs,
         env_kwargs=dict(
             psn_path=psn_path,
+            base_env_kwargs=dict(
+                accumulate_reward=accumulate_reward,
+                discount_acc_rew=discount_acc_rew,
+            ),
             time_limit=eval_time_limit,
             time_limit_kwargs=dict(max_episode_steps=eval_max_ep_steps),
             reset_load_class=eval_reset_load_class,
             reset_load_kwargs=eval_reset_load_kwargs,
             hadrl_nsprs=True,
-            hadrl_nsprs_kwargs=dict(nsprs_per_ep=eval_nsprs_per_ep,
-                                    vnfs_per_nspr=5,
-                                    load=eval_load,
-                                    always_one=True),
+            hadrl_nsprs_kwargs=dict(
+                nsprs_per_ep=eval_nsprs_per_ep,
+                vnfs_per_nspr=5,
+                load=eval_load,
+                always_one=True
+            ),
             placement_state=placement_state,
         ),
         seed=12,
@@ -108,7 +122,7 @@ if __name__ == '__main__':
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs, )
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
+    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
                 learning_rate=0.0001,
                 n_steps=1,  # ogni quanti step fare un update
                 gamma=0.99,
@@ -116,7 +130,7 @@ if __name__ == '__main__':
                 ent_coef=0.01,
                 # max_grad_norm=0.9,
                 use_rms_prop=True,
-                tensorboard_log="../tb_logs/",
+                # tensorboard_log="../tb_logs/",
                 policy_kwargs=policy_kwargs)
 
     # model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
@@ -167,14 +181,14 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    wandb_run = wandb.init(
-        project="No placement state",
-        dir="../",
-        name="YES placement state",
-        config=config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        save_code=True,  # optional
-    )
+    # wandb_run = wandb.init(
+    #     project="No placement state",
+    #     dir="../",
+    #     name="YES placement state",
+    #     config=config,
+    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    #     save_code=True,  # optional
+    # )
 
     # training callbacks
     list_of_callbacks = [
@@ -193,9 +207,9 @@ if __name__ == '__main__':
                        use_placement_state=placement_state,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-                      verbose=2,
-                      model_save_freq=10_000),
+        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+        #               verbose=2,
+        #               model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
                      eval_freq=5_000, deterministic=True, verbose=2,
@@ -217,4 +231,4 @@ if __name__ == '__main__':
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    wandb_run.finish()
+    # wandb_run.finish()

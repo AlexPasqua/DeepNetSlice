@@ -1,4 +1,3 @@
-import warnings
 from queue import Queue
 import gym
 import numpy as np
@@ -81,9 +80,6 @@ class AcceptanceRatioByNSPRsCallback(BaseCallback):
    A custom callback that derives from ``BaseCallback``.
    It logs the acceptance ratio on Tensorboard.
 
-   Note: it works only with non-vectorized environment or with a vectorized one
-   containing only 1 environment.
-
    :param env: environment
    :param name: name of the metric to log
    :param nsprs_per_tr_phase: number of NSPRs that define a training phase.
@@ -117,9 +113,6 @@ class AcceptanceRatioByNSPRsCallback(BaseCallback):
         # once an env is ready for logging, its cell is increased by 1,
         # and it is decreased by 1 when the acceptance ratio is logged
         self.ready_envs = np.zeros(shape=env.num_envs, dtype=int)
-        if isinstance(self.env, VecEnv) and self.env.num_envs > 1:
-            warnings.warn("The env is vectorized, only the first env instance "
-                          "will be used for the acceptance ratio by NSPRs.")
 
     def _on_step(self) -> bool:
         if isinstance(self.env, VecEnv):
