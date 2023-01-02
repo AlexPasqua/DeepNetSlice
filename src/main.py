@@ -17,7 +17,7 @@ from utils import make_env, create_HADRL_PSN_file, create_HEENSO_PSN_file
 from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
 
 if __name__ == '__main__':
-    psn_path = "../PSNs/hadrl_1-16_5-10_15-4.graphml"
+    psn_path = "../PSNs/waxman_20_servers.graphml"
 
     # create_HADRL_PSN_file(
     #     path=psn_path,
@@ -50,6 +50,7 @@ if __name__ == '__main__':
     placement_state = True
     accumulate_reward = False
     discount_acc_rew = True
+    dynamic_connectivity = True
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=n_tr_envs,
@@ -70,7 +71,8 @@ if __name__ == '__main__':
             ),
             reset_load_class=tr_reset_load_class,
             reset_load_kwargs=tr_reset_load_kwargs,
-            placement_state=placement_state
+            placement_state=placement_state,
+            dynamic_connectivity=dynamic_connectivity,
         ),
         seed=12,
     )
@@ -105,6 +107,7 @@ if __name__ == '__main__':
                 always_one=True
             ),
             placement_state=placement_state,
+            dynamic_connectivity=dynamic_connectivity,
         ),
         seed=12,
     )
