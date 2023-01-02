@@ -20,6 +20,7 @@ def make_env(
         hadrl_nsprs_kwargs: Optional[dict] = None,
         placement_state: bool = True,
         dynamic_connectivity: bool = False,
+        dynamic_connectivity_kwargs: Optional[dict] = None,
 ):
     """ Create the environment.
     It can be wrapped with different wrappers, all with their own arguments.
@@ -35,10 +36,12 @@ def make_env(
     :param hadrl_nsprs_kwargs: kwargs for the NSPRsGeneratorHADRL wrapper
     :param placement_state: if False, adds a wrapper that removes the placement state from the observations
     :param dynamic_connectivity: if True, the connectivity of the PSN changes in every episode
+    :param dynamic_connectivity_kwargs: kwargs for the DynamicConnectivity wrapper
     """
     base_env_kwargs = {} if base_env_kwargs is None else base_env_kwargs
     time_limit_kwargs = {} if time_limit_kwargs is None else time_limit_kwargs
     reset_load_kwargs = {} if reset_load_kwargs is None else reset_load_kwargs
+    dynamic_connectivity_kwargs = {} if dynamic_connectivity_kwargs is None else dynamic_connectivity_kwargs
 
     # base env
     env = NetworkSimulator(psn_path, **base_env_kwargs)
@@ -49,7 +52,7 @@ def make_env(
     if hadrl_nsprs:
         env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
     if dynamic_connectivity:
-        env = DynamicConnectivity(env)
+        env = DynamicConnectivity(env, **dynamic_connectivity_kwargs)
     if reset_load_class is not None:
         env = reset_load_class(env, **reset_load_kwargs)
     if not placement_state:

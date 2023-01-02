@@ -51,6 +51,7 @@ if __name__ == '__main__':
     accumulate_reward = False
     discount_acc_rew = True
     dynamic_connectivity = True
+    dynamic_connectivity_kwargs = dict(link_bw=10_000)
     tr_env = make_vec_env(
         env_id=make_env,
         n_envs=n_tr_envs,
@@ -73,6 +74,7 @@ if __name__ == '__main__':
             reset_load_kwargs=tr_reset_load_kwargs,
             placement_state=placement_state,
             dynamic_connectivity=dynamic_connectivity,
+            dynamic_connectivity_kwargs=dynamic_connectivity_kwargs
         ),
         seed=12,
     )
@@ -108,6 +110,7 @@ if __name__ == '__main__':
             ),
             placement_state=placement_state,
             dynamic_connectivity=dynamic_connectivity,
+            dynamic_connectivity_kwargs=dynamic_connectivity_kwargs
         ),
         seed=12,
     )
