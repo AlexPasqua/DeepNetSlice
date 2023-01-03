@@ -34,15 +34,18 @@ class DynamicConnectivity(gym.Wrapper):
         # set of unvisited nodes
         unvisited = set(self.psn.nodes)
         while unvisited:
-            # sample 2 unvisited nodes
-            u, v = random.sample(unvisited, 2)
+            # sample a node form the PSN
+            u = random.choice(self.psn.nodes)
+            # sample an unvisited nodes to connect to it
+            v = random.choice(unvisited)
             # connect the 2 nodes
             self.psn.add_edge(u, v, BWcap=self.link_bw, availBW=self.link_bw)
             # save the amount of bandwidth introduced in the PSN
             self.placed_bw += self.link_bw
             # remove the nodes from the set of unvisited nodes
-            unvisited.remove(u)
             unvisited.remove(v)
+            if u in unvisited:
+                unvisited.remove(u)
 
         # if the total bandwidth of the PSN hasn't been reached, reach it by adding random links
         while self.placed_bw < self.tot_bw_cap:
