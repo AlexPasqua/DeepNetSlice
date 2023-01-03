@@ -362,19 +362,22 @@ class ResetWithRealisticLoad(gym.Wrapper):
                 except KeyError:
                     # it means either src_vnf_id, dst_vnf_id or both hasn't been placed -> skip link placement
                     continue
-                path = nx.shortest_path(G=self.env.psn, source=src_node_id,
-                                        target=dst_node_id, weight=self.compute_links_weights,
-                                        method='dijkstra')
-                for i in range(len(path) - 1):
-                    # if this VL exceeds the bandwidth available, don't place it, it's okù
-                    # it can happen when there is no available path
-                    if self.env.psn.edges[path[i], path[i+1]]['availBW'] - vl['reqBW'] < 0:
-                        continue
-                    self.env.psn.edges[path[i], path[i+1]]['availBW'] -= vl['reqBW']
-                    idx1 = self.env.map_id_idx[path[i]]
-                    idx2 = self.env.map_id_idx[path[i+1]]
-                    self.env.obs_dict['bw_avails'][idx1] -= vl['reqBW'] / self.env.max_bw
-                    self.env.obs_dict['bw_avails'][idx2] -= vl['reqBW'] / self.env.max_bw
+                try:
+                    path = nx.shortest_path(G=self.env.psn, source=src_node_id,
+                                            target=dst_node_id, weight=self.compute_links_weights,
+                                            method='dijkstra')
+                    for i in range(len(path) - 1):
+                        # if this VL exceeds the bandwidth available, don't place it, it's okù
+                        # it can happen when there is no available path
+                        if self.env.psn.edges[path[i], path[i+1]]['availBW'] - vl['reqBW'] < 0:
+                            continue
+                        self.env.psn.edges[path[i], path[i+1]]['availBW'] -= vl['reqBW']
+                        idx1 = self.env.map_id_idx[path[i]]
+                        idx2 = self.env.map_id_idx[path[i+1]]
+                        self.env.obs_dict['bw_avails'][idx1] -= vl['reqBW'] / self.env.max_bw
+                        self.env.obs_dict['bw_avails'][idx2] -= vl['reqBW'] / self.env.max_bw
+                except nx.NetworkXNoPath:
+                    pass
 
     def compute_links_weights(self, source, target, link):
         """ Method called automatically by nx.shortest_path() """
