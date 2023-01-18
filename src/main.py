@@ -17,7 +17,7 @@ from utils import make_env, create_HADRL_PSN_file, create_HEENSO_PSN_file
 from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
 
 if __name__ == '__main__':
-    psn_path = "../PSNs/waxman_20_servers.graphml"
+    psn_path = "../PSNs/hadrl_1-16_5-10_15-4.graphml"
 
     # create_HADRL_PSN_file(
     #     path=psn_path,
@@ -45,12 +45,12 @@ if __name__ == '__main__':
     tr_time_limit = False
     tr_max_ep_steps = 1000
     tr_reset_load_class = ResetWithRealisticLoad
-    # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    tr_reset_load_kwargs = dict(cpu_load=0.8)
+    # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0., 0.9))
+    tr_reset_load_kwargs = dict(cpu_load=0.5)
     placement_state = True
-    accumulate_reward = False
+    accumulate_reward = True
     discount_acc_rew = True
-    dynamic_connectivity = True
+    dynamic_connectivity = False
     dynamic_connectivity_kwargs = dict(link_bw=10_000)
     tr_env = make_vec_env(
         env_id=make_env,
@@ -86,8 +86,8 @@ if __name__ == '__main__':
     eval_time_limit = False
     eval_max_ep_steps = 1000
     eval_reset_load_class = ResetWithRealisticLoad
-    # eval_reset_with_load_kwargs = dict(rand_load=True, rand_range=(0.3, 0.4))
-    eval_reset_load_kwargs = dict(cpu_load=0.8)
+    # eval_reset_load_kwargs = dict(rand_load=True, rand_range=(0.2, 0.7))
+    eval_reset_load_kwargs = dict(cpu_load=0.5)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -128,15 +128,16 @@ if __name__ == '__main__':
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs, )
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
                 learning_rate=0.0001,
                 n_steps=1,  # ogni quanti step fare un update
                 gamma=0.99,
                 gae_lambda=0.92,
                 ent_coef=0.01,
+                seed=12,
                 # max_grad_norm=0.9,
                 use_rms_prop=True,
-                # tensorboard_log="../tb_logs/",
+                tensorboard_log="../tb_logs/",
                 policy_kwargs=policy_kwargs)
 
     # model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
@@ -187,14 +188,14 @@ if __name__ == '__main__':
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
-    # wandb_run = wandb.init(
-    #     project="No placement state",
-    #     dir="../",
-    #     name="YES placement state",
-    #     config=config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     save_code=True,  # optional
-    # )
+    wandb_run = wandb.init(
+        project="ACTUAL EXPERIMENTS - results replication",
+        dir="../",
+        name="Benchmark 0.5 (w/ seed)",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        save_code=True,  # optional
+    )
 
     # training callbacks
     list_of_callbacks = [
@@ -213,9 +214,9 @@ if __name__ == '__main__':
                        use_placement_state=placement_state,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-        #               verbose=2,
-        #               model_save_freq=10_000),
+        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+                      verbose=2,
+                      model_save_freq=10_000),
 
         EvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
                      eval_freq=5_000, deterministic=True, verbose=2,
@@ -237,4 +238,4 @@ if __name__ == '__main__':
                 # tb_log_name="A2C_Adam",
                 callback=list_of_callbacks)
 
-    # wandb_run.finish()
+    wandb_run.finish()

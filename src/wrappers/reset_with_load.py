@@ -59,7 +59,7 @@ class ResetWithFixedLoad(ResetWithLoad):
 
 
 class ResetWithRandLoad(ResetWithLoad):
-    """ Reset the PSN with a random uniform amount of tr_load """
+    """ Reset the PSN with a random uniform amount of load """
 
     def __init__(self, env: gym.Env, min_perc: Union[float, dict],
                  max_perc: Union[float, dict], same_for_all: bool = True,
@@ -160,8 +160,7 @@ class ResetWithLoadMixed(gym.Wrapper):
         else:
             assert len(rand_range) == 2 and 0. <= rand_range[0] <= 1. and \
                    0. <= rand_range[1] <= 1.
-            min_load, max_load = rand_range
-            self.rand_vals = np.arange(min_load, max_load, 0.1)
+            self.rand_vals = np.arange(min(rand_range), max(rand_range), 0.1)
 
     def reset(self, **kwargs):
         self.env.reset(**kwargs)
@@ -175,8 +174,9 @@ class ResetWithLoadMixed(gym.Wrapper):
     def _init_psn_load(self):
         """ Initialize the PSN's load """
         if self.random:
-            load = np.random.choice(self.rand_vals, 1)
-            self.cpu_load = self.ram_load = self.bw_load = load[0]
+            load = random.choice(self.rand_vals)
+            self.cpu_load = self.ram_load = load
+            self.bw_load = max(0.0, load - 0.4)
 
         # TODO: occhio che 'reset' qui viene chiamato da ogni env in VecEnv singolarmente...
         # TODO: quindi, qui, self.env non è VecEnv, ma solo NetworkSimulator
@@ -207,7 +207,7 @@ class ResetWithLoadMixed(gym.Wrapper):
                 if node['NodeType'] == 'server':
                     idx = map_id_idx[node_id]
                     # TODO: consider to extend as [0.25, 0.5, 0.75, 1.]
-                    perc_to_remove = np.random.choice([0.5], 1)[0]
+                    perc_to_remove = random.choice([0.5])
                     # CPU to remove
                     # x% of the node capacity (normalized)
                     cur_cpu_to_remove = perc_to_remove * node['CPUcap'] / max_cpu
@@ -230,7 +230,7 @@ class ResetWithLoadMixed(gym.Wrapper):
             while tot_bw_to_remove > 0:
                 extremes, link = random.sample(links, 1)[0]
                 # TODO: consider to extend as [0.25, 0.5, 0.75, 1.]
-                perc_to_remove = np.random.choice([0.5], 1)[0]
+                perc_to_remove = random.choice([0.5])
                 # cur_bw_to_remove = np.random.randint(0, link['availBW'] + 1, 1)[0]
                 cur_bw_to_remove = perc_to_remove * link['BWcap']
                 # cur_bw_to_remove = min(cur_bw_to_remove, tot_bw_to_remove * max_bw)
@@ -278,8 +278,8 @@ class ResetWithLoadBinary(ResetWithLoadMixed):
     def _init_psn_load(self):
         """ Initialize the PSN's load """
         if self.random:
-            load = np.random.choice(self.rand_vals, 1)
-            self.cpu_load = self.ram_load = self.bw_load = load[0]
+            load = random.choice(self.rand_vals)
+            self.cpu_load = self.ram_load = self.bw_load = load
 
         psns = self.env.get_attr('psn') if isinstance(self.env, VecEnv) else [self.env.psn]
         max_cpus = self.env.get_attr('max_cpu') if isinstance(self.env, VecEnv) else [self.env.max_cpu]
@@ -385,16 +385,16 @@ class ResetWithRealisticLoad(gym.Wrapper):
 
     def sample_suitable_node(self, vnf: dict):
         """ Sample a random node with enough resources to host the VNF """
-        server_idx = np.random.choice(list(self.env.servers_map_idx_id.keys()))
+        server_idx = random.choice(list(self.env.servers_map_idx_id.keys()))
         server_id = self.env.servers_map_idx_id[server_idx]
         while not self.env.enough_avail_resources(server_id, vnf):
-            server_idx = np.random.choice(list(self.env.servers_map_idx_id.keys()))
+            server_idx = random.choice(list(self.env.servers_map_idx_id.keys()))
             server_id = self.env.servers_map_idx_id[server_idx]
         return server_id, server_idx
 
     def sample_nspr(self):
         """ Sample a NSPR among the ones that will arrive in this episode """
-        arr_time = np.random.choice(list(self.env.nsprs.keys()))
+        arr_time = random.choice(list(self.env.nsprs.keys()))
         idx = np.random.choice(len(self.env.nsprs[arr_time]))
         nspr = self.env.nsprs[arr_time][idx]
         return nspr
