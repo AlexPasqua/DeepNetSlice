@@ -17,7 +17,7 @@ from utils import make_env, create_HADRL_PSN_file, create_HEENSO_PSN_file
 from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
 
 if __name__ == '__main__':
-    psn_path = "../PSNs/hadrl_1-16_5-10_15-4.graphml"
+    psn_path = "../PSNs/waxman_20_servers.graphml"
 
     # create_HADRL_PSN_file(
     #     path=psn_path,
@@ -44,9 +44,9 @@ if __name__ == '__main__':
     tr_load = 0.9
     tr_time_limit = False
     tr_max_ep_steps = 1000
-    tr_reset_load_class = ResetWithRealisticLoad
-    # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0., 0.9))
-    tr_reset_load_kwargs = dict(cpu_load=0.5)
+    tr_reset_load_class = ResetWithLoadMixed
+    tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0., 1.))
+    # tr_reset_load_kwargs = dict(cpu_load=0.5)
     placement_state = True
     accumulate_reward = True
     discount_acc_rew = True
@@ -85,9 +85,9 @@ if __name__ == '__main__':
     eval_load = 0.9
     eval_time_limit = False
     eval_max_ep_steps = 1000
-    eval_reset_load_class = ResetWithRealisticLoad
-    # eval_reset_load_kwargs = dict(rand_load=True, rand_range=(0.2, 0.7))
-    eval_reset_load_kwargs = dict(cpu_load=0.5)
+    eval_reset_load_class = ResetWithLoadMixed
+    eval_reset_load_kwargs = dict(rand_load=True, rand_range=(0., 1.))
+    # eval_reset_load_kwargs = dict(cpu_load=0.5)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -128,8 +128,8 @@ if __name__ == '__main__':
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs, )
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:1',
-                learning_rate=0.0001,
+    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+                learning_rate=0.0002,
                 n_steps=1,  # ogni quanti step fare un update
                 gamma=0.99,
                 gae_lambda=0.92,
@@ -185,13 +185,17 @@ if __name__ == '__main__':
         "GCNs layers dims": policy_kwargs['gcn_layers_dims'],
         "mpl_extractor arch": policy_kwargs["net_arch"],
         "use placement state": placement_state,
+        "accumulate reward": accumulate_reward,
+        "discount acceptance reward": discount_acc_rew,
+        "dynamic connectivity": dynamic_connectivity,
+        "dynamic load range": "0-0.9",
         "use heuristic": use_heuristic,
         **heu_kwargs,
     }
     wandb_run = wandb.init(
-        project="ACTUAL EXPERIMENTS - results replication",
+        project="Dynamic load",
         dir="../",
-        name="Benchmark 0.5 (w/ seed)",
+        name="Waxman20 - load 0-0.9",
         config=config,
         sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
         save_code=True,  # optional

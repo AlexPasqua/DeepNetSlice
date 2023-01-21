@@ -146,6 +146,7 @@ class ResetWithLoadMixed(gym.Wrapper):
         self.random = rand_load
         self.tot_cpu_cap = self.tot_ram_cap = self.tot_bw_cap = None
         if not rand_load:
+            assert isinstance(load, (float, dict)), "Param 'load' is of an incorrect type"
             if isinstance(load, float):
                 assert 0. <= load <= 1.
                 self.cpu_load = self.ram_load = self.bw_load = load
@@ -155,8 +156,6 @@ class ResetWithLoadMixed(gym.Wrapper):
                 self.bw_load = load.get('bw', 0)
                 assert 0. <= self.cpu_load <= 1. and 0. <= self.ram_load <= 1. and \
                        0. <= self.bw_load <= 1.
-            else:
-                raise ValueError("Param 'load' is of an incorrect type")
         else:
             assert len(rand_range) == 2 and 0. <= rand_range[0] <= 1. and \
                    0. <= rand_range[1] <= 1.
