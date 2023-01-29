@@ -29,7 +29,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             lr_schedule: Callable[[float], float],
             psn: nx.Graph,
             servers_map_idx_id: Dict[int, int],
-            net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
+            net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
             activation_fn: Type[nn.Module] = nn.Tanh,
             gcn_layers_dims: Tuple[int] = (60,),
             nspr_out_features: int = 4,
@@ -52,8 +52,8 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         :param heu_kwargs: Keyword arguments for the heuristic
         """
 
-        assert len(net_arch) == 1 and isinstance(net_arch[0], dict), \
-            "This policy allows net_arch to be a list with only one dict"
+        # assert len(net_arch) == 1 and isinstance(net_arch[0], dict), \
+        #     "This policy allows net_arch to be a list with only one dict"
 
         self.psn = psn
         self.gcn_layers_dims = gcn_layers_dims  # saved in an attribute for logging purposes
