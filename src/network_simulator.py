@@ -1,6 +1,6 @@
 import copy
 import math
-from typing import Union, Tuple
+from typing import Optional, Union, Tuple
 
 import gym
 import networkx as nx
@@ -24,6 +24,7 @@ class NetworkSimulator(gym.Env):
             nsprs_max_duration: int = 100,
             accumulate_reward: bool = True,
             discount_acc_rew: bool = True,
+            perc_avail_nodes: Optional[float] = 1.
     ):
         """ Constructor
         :param psn_file: GraphML file containing the definition of the PSN
@@ -33,6 +34,8 @@ class NetworkSimulator(gym.Env):
         :param accumulate_reward: if true, the reward is accumulated and given to the agent only after each NSPRs
         :param discount_acc_rew: if true, an increasing discount factor is applied to the acceptance reward during each NSPR.
             It starts from the inverse of the number of VNFs in the NSPR and grows to 1.
+        :param perc_avail_nodes: in case some action masking is implemented (i.e., env wrapped in ActionMasker
+            wrapper from sbe-contrib), it specifies the percentage of available nodes we.r.t. the total.
         """
         super(NetworkSimulator, self).__init__()
 
@@ -102,10 +105,20 @@ class NetworkSimulator(gym.Env):
         self._empty_psn_obs_dict = None     # used to store the observation resulting from an empty PSN
         self.obs_dict = self._init_obs_dict()     # used to store the current observation
 
+        # action mask determining available actions. Init with all actions are available (it will be update in 'reset')
+        self._action_mask = np.ones(shape=(len(servers_ids),), dtype=bool)
+        assert 0. <= perc_avail_nodes <= 1.
+        self.perc_avail_nodes = perc_avail_nodes
+
     @property
     def cur_vnf(self):
         return self.cur_nspr.nodes[self.cur_vnf_id] if self.cur_nspr is not None else None
-
+    
+    def get_action_mask(self, env):
+        # 'action_mask' needs to be callable to be passed ActionMasker wrapper
+        # note: env needs to be an argument for compatibility, but in this case it's useless
+        return self._action_mask
+    
     def reset_partial_rewards(self):
         """ Resets the partial rewards (used in case a NSPR cannot be placed) """
         self._acceptance_rewards = []
@@ -394,6 +407,15 @@ class NetworkSimulator(gym.Env):
         # get arrived NSPRs
         self.waiting_nsprs += self.nsprs.get(self.time_step, [])
         self.pick_next_nspr()
+
+        # update action mask (if no action masking is implemented, it has no effect)
+        self._action_mask[:] = True
+        # verison one: more randomic
+        # indexes = np.random.rand(*self._action_mask.shape) < self.perc_avail_nodes
+        # version two: less randomic
+        size = round(self.perc_avail_nodes * self.action_space.n)
+        indexes = np.random.choice(self.action_space.n, size=size, replace=False)
+        self._action_mask[indexes] = False
 
         # new observation
         obs = self.update_nspr_state()

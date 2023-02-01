@@ -36,7 +36,7 @@ class HADRLActor(nn.Module):
         heu_class = heu_kwargs.get('heu_class', HADRLHeuristic)
 
         # layers
-        dims = [in_features] + net_arch[0]['pi']
+        dims = [in_features] + net_arch['pi']
         modules = nn.ModuleList()
         for i in range(len(dims) - 1):
             modules.append(nn.Linear(dims[i], dims[i + 1]))
@@ -72,7 +72,7 @@ class HADRLCritic(nn.Module):
             i.e., input dim of the first layer of the network
         """
         super().__init__()
-        dims = [in_features] + net_arch[0]['vf']
+        dims = [in_features] + net_arch['vf']
         modules = nn.ModuleList()
         for i in range(len(dims) - 1):
             modules.append(nn.Linear(dims[i], dims[i + 1]))
@@ -117,8 +117,8 @@ class HADRLActorCriticNet(nn.Module):
 
         # IMPORTANT:
         # Save output dimensions, used to create the distributions
-        self.latent_dim_pi = net_arch[0]['pi'][-1]
-        self.latent_dim_vf = net_arch[0]['vf'][-1]
+        self.latent_dim_pi = net_arch['pi'][-1]
+        self.latent_dim_vf = net_arch['vf'][-1]
 
         if isinstance(features_dim, int):
             policy_features_dim = value_features_dim = features_dim

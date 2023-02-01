@@ -52,7 +52,7 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
         :param heu_kwargs: Keyword arguments for the heuristic
         """
 
-        assert len(net_arch) == 1 and isinstance(net_arch[0], dict), \
+        assert isinstance(net_arch, dict), \
             "This policy allows net_arch to be a list with only one dict"
 
         self.psn = psn
