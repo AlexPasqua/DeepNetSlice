@@ -7,6 +7,7 @@ import numpy as np
 from gym.utils.env_checker import check_env
 from network_simulator import NetworkSimulator
 from wrappers import NSPRsGeneratorHADRL, RemovePlacementState, DynamicConnectivity
+from sb3_contrib.common.wrappers import ActionMasker
 
 
 def make_env(
@@ -20,7 +21,8 @@ def make_env(
         hadrl_nsprs_kwargs: Optional[dict] = None,
         placement_state: bool = True,
         dynamic_connectivity: bool = False,
-        dynamic_connectivity_kwargs: Optional[dict] = None,
+        dynamic_connectivity_kwargs: Optional[dict] = dict(link_bw=10_000),
+        dynamic_topology: bool = False,
 ):
     """ Create the environment.
     It can be wrapped with different wrappers, all with their own arguments.
@@ -37,6 +39,9 @@ def make_env(
     :param placement_state: if False, adds a wrapper that removes the placement state from the observations
     :param dynamic_connectivity: if True, the connectivity of the PSN changes in every episode
     :param dynamic_connectivity_kwargs: kwargs for the DynamicConnectivity wrapper
+    :param dynamic_topology: if True, the topology of the PSN changes in every episode.
+        Note: it True, 'dynamic_connectivity' will be forced to True as well,
+        as there's no way to change the nodes and not the connectivity.
     """
     base_env_kwargs = {} if base_env_kwargs is None else base_env_kwargs
     time_limit_kwargs = {} if time_limit_kwargs is None else time_limit_kwargs
@@ -51,6 +56,9 @@ def make_env(
         env = gym.wrappers.TimeLimit(env, **time_limit_kwargs)
     if hadrl_nsprs:
         env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
+    if dynamic_topology:
+        dynamic_connectivity = True
+        env = ActionMasker(env, action_mask_fn=env.get_action_mask)
     if dynamic_connectivity:
         env = DynamicConnectivity(env, **dynamic_connectivity_kwargs)
     if reset_load_class is not None:
