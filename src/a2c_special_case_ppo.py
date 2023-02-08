@@ -29,10 +29,10 @@ if __name__ == '__main__':
     tr_load = 0.5
     tr_time_limit = False
     tr_max_ep_steps = 1000
-    tr_reset_load_class = ResetWithRealisticLoad
+    tr_reset_load_class = ResetWithLoadMixed
     # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0., 1.))
-    # tr_reset_load_kwargs = dict(load=dict(cpu=0.5, ram=0.5, bw=0.2))
-    tr_reset_load_kwargs = dict(cpu_load=tr_load)
+    tr_reset_load_kwargs = dict(load=dict(cpu=0.5, ram=0.5, bw=0.2))
+    # tr_reset_load_kwargs = dict(cpu_load=tr_load)
     placement_state = True
     accumulate_reward = True
     discount_acc_rew = True
@@ -75,9 +75,9 @@ if __name__ == '__main__':
     eval_load = 0.5
     eval_time_limit = False
     eval_max_ep_steps = 1000
-    eval_reset_load_class = ResetWithRealisticLoad
-    # eval_reset_load_kwargs = dict(load=dict(cpu=0.5, ram=0.5, bw=0.2))
-    eval_reset_load_kwargs = dict(cpu_load=eval_load)
+    eval_reset_load_class = ResetWithLoadMixed
+    eval_reset_load_kwargs = dict(load=dict(cpu=0.5, ram=0.5, bw=0.2))
+    # eval_reset_load_kwargs = dict(cpu_load=eval_load)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -101,7 +101,8 @@ if __name__ == '__main__':
             ),
             placement_state=placement_state,
             dynamic_connectivity=dynamic_connectivity,
-            dynamic_connectivity_kwargs=dynamic_connectivity_kwargs
+            dynamic_connectivity_kwargs=dynamic_connectivity_kwargs,
+            dynamic_topology=dynamic_topology
         ),
         seed=12,
     )
@@ -143,7 +144,7 @@ if __name__ == '__main__':
     #             tensorboard_log="../tb_logs/",
     #             policy_kwargs=a2c_policy_kwargs)
     
-    # ppo = PPO(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+    # ppo = PPO(policy=policy, env=tr_env, verbose=2, device='cuda:1',
     #     policy_kwargs=ppo_policy_kwargs,
     #     learning_rate=0.0001,
     #     n_steps=1,
@@ -156,7 +157,7 @@ if __name__ == '__main__':
     #     seed=12,
     # )
 
-    maskable_ppo = MaskablePPO(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
+    maskable_ppo = MaskablePPO(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cpu',
         # policy_kwargs=ppo_policy_kwargs,
         policy_kwargs=dict(
             activation_fn=nn.Tanh,
@@ -176,7 +177,7 @@ if __name__ == '__main__':
         batch_size=20,  # n_steps * n_envs
         normalize_advantage=False,
         clip_range_vf=None,
-        tensorboard_log="../tb_logs/",
+        # tensorboard_log="../tb_logs/",
         seed=12,)
 
     # define some training hyperparams
@@ -210,14 +211,14 @@ if __name__ == '__main__':
         **heu_kwargs,
     }
 
-    wandb_run = wandb.init(
-        project="Masked actions",
-        dir="../",
-        name="Maskable PPO (same act (tanh), wax 50, load 0.5, 0.7 avail nodes)",
-        config=config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        save_code=True,  # optional
-    )
+    # wandb_run = wandb.init(
+    #     project="Masked actions",
+    #     dir="../",
+    #     name="Maskable PPO (same act (tanh), wax 50, load 0.5, 0.7 avail nodes)",
+    #     config=config,
+    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    #     save_code=True,  # optional
+    # )
 
     # training callbacks
     list_of_callbacks = [
@@ -236,9 +237,9 @@ if __name__ == '__main__':
                        use_placement_state=placement_state,
                        use_heuristic=use_heuristic, heu_kwargs=heu_kwargs, ),
 
-        WandbCallback(model_save_path=f"../models/{wandb_run.id}",
-                      verbose=2,
-                      model_save_freq=10_000),
+        # WandbCallback(model_save_path=f"../models/{wandb_run.id}",
+        #               verbose=2,
+        #               model_save_freq=10_000),
         
         EvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
                      eval_freq=5_000, deterministic=True, verbose=2,
@@ -254,10 +255,12 @@ if __name__ == '__main__':
         SeenNSPRsCallback(env=tr_env, freq=100, verbose=1),
     ]
 
-    # # A2C training
+    # A2C training
     # a2c.learn(total_timesteps=tot_tr_steps,
     #             log_interval=10,
     #             callback=list_of_callbacks)
+
+    # wandb_run.finish()
 
     # # PPO training
     # ppo.learn(total_timesteps=tot_tr_steps,
@@ -269,4 +272,4 @@ if __name__ == '__main__':
                 log_interval=10,
                 callback=list_of_callbacks)
 
-    wandb_run.finish()
+    # wandb_run.finish()

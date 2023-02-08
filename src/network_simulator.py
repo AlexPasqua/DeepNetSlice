@@ -413,7 +413,7 @@ class NetworkSimulator(gym.Env):
         # verison one: more randomic
         # indexes = np.random.rand(*self._action_mask.shape) < self.perc_avail_nodes
         # version two: less randomic
-        size = round(self.perc_avail_nodes * self.action_space.n)
+        size = round((1. - self.perc_avail_nodes) * self.action_space.n)
         indexes = np.random.choice(self.action_space.n, size=size, replace=False)
         self._action_mask[indexes] = False
 

@@ -57,15 +57,16 @@ def make_env(
     if hadrl_nsprs:
         env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
     if dynamic_topology:
-        dynamic_connectivity = True
         env = ActionMasker(env, action_mask_fn=env.get_action_mask)
+        env = DynamicConnectivity(env, nodes_mask=env.get_action_mask, **dynamic_connectivity_kwargs)
+        dynamic_connectivity = False
     if dynamic_connectivity:
         env = DynamicConnectivity(env, **dynamic_connectivity_kwargs)
     if reset_load_class is not None:
         env = reset_load_class(env, **reset_load_kwargs)
     if not placement_state:
         env = RemovePlacementState(env)
-    check_env(env)
+    # check_env(env)  # could make the code crash with masked actions
     return env
 
 

@@ -39,14 +39,14 @@ if __name__ == '__main__':
     psn = reader.read_psn(psn_path)
 
     # training environment
-    n_tr_envs = 20
+    n_tr_envs = 20          # so che sarebbe 1 in HADRL, ma in caso taglia il grafico ad 1/20 degli step, perché con 1 è super lento
     tr_nsprs_per_ep = 1
-    tr_load = 0.9
+    tr_load = 0.8
     tr_time_limit = False
     tr_max_ep_steps = 1000
     tr_reset_load_class = ResetWithRealisticLoad
     # tr_reset_load_kwargs = dict(rand_load=True, rand_range=(0., 1.))
-    tr_reset_load_kwargs = dict(cpu_load=0.8)
+    tr_reset_load_kwargs = dict(cpu_load=tr_load)
     placement_state = True
     accumulate_reward = True
     discount_acc_rew = True
@@ -82,12 +82,12 @@ if __name__ == '__main__':
     # evaluation environment
     n_eval_envs = 4
     eval_nsprs_per_ep = 1
-    eval_load = 0.9
+    eval_load = 0.8
     eval_time_limit = False
     eval_max_ep_steps = 1000
     eval_reset_load_class = ResetWithRealisticLoad
     # eval_reset_load_kwargs = dict(rand_load=True, rand_range=(0., 1.))
-    eval_reset_load_kwargs = dict(cpu_load=0.8)
+    eval_reset_load_kwargs = dict(cpu_load=eval_load)
     eval_env = make_vec_env(
         env_id=make_env,
         n_envs=n_eval_envs,
@@ -128,38 +128,39 @@ if __name__ == '__main__':
                          use_heuristic=use_heuristic,
                          heu_kwargs=heu_kwargs, )
 
-    model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
-                learning_rate=0.0002,
-                n_steps=1,  # ogni quanti step fare un update
-                gamma=0.99,
-                gae_lambda=0.92,
-                ent_coef=0.01,
-                seed=12,
-                # max_grad_norm=0.9,
-                use_rms_prop=True,
-                tensorboard_log="../tb_logs/",
-                policy_kwargs=policy_kwargs)
-
-    # model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
-    #             learning_rate=0.0002,
+    # model = A2C(policy=policy, env=tr_env, verbose=2, device='cuda:0',
+    #             learning_rate=0.0013,   # mean between HADRL's actor and critic's learning rate
     #             n_steps=1,  # ogni quanti step fare un update
-    #             gamma=0.99,
-    #             ent_coef=0.01,
-    #             gae_lambda=0.92,
+    #             gamma=0.99, # non si sa che valore usano
+    #             gae_lambda=1,   # classic advantage
+    #             ent_coef=0.5,  # sembra using 0.5, altissimo, ma vediamo
     #             seed=12,
     #             # max_grad_norm=0.9,
     #             use_rms_prop=True,
     #             tensorboard_log="../tb_logs/",
-    #             policy_kwargs=dict(
-    #                 activation_fn=nn.Tanh,
-    #                 net_arch=dict(pi=[256, 128], vf=[256, 128, 32]),
-    #                 features_extractor_class=HADRLFeaturesExtractor,
-    #                 features_extractor_kwargs=dict(
-    #                     psn=psn,
-    #                     activation_fn=nn.ReLU,
-    #                     gcn_layers_dims=policy_kwargs['gcn_layers_dims'],
-    #                 )
-    #             ))
+    #             policy_kwargs=policy_kwargs)
+
+    model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
+                learning_rate=0.0002,
+                n_steps=1,  # ogni quanti step fare un update
+                gamma=0.99,
+                ent_coef=0.01,
+                gae_lambda=0.92,
+                seed=12,
+                # max_grad_norm=0.9,
+                use_rms_prop=True,
+                tensorboard_log="../tb_logs/",
+                policy_kwargs=dict(
+                    activation_fn=nn.ReLU,
+                    net_arch=dict(pi=[256, 128], vf=[256, 128, 32]),
+                    features_extractor_class=HADRLFeaturesExtractor,
+                    share_features_extractor=False,
+                    features_extractor_kwargs=dict(
+                        psn=psn,
+                        activation_fn=nn.ReLU,
+                        gcn_layers_dims=policy_kwargs['gcn_layers_dims'],
+                    )
+                ))
 
     print(model.policy)
 
@@ -196,7 +197,7 @@ if __name__ == '__main__':
     wandb_run = wandb.init(
         project="Same or different activations",
         dir="../",
-        name="SAME (ReLU) (wax50, load 0.8, small GCNs)",
+        name="SAME (ReLU) (non-shared f.e.) (wax50, load 0.8, small GCNs)",
         config=config,
         sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
         save_code=True,  # optional
