@@ -3,6 +3,7 @@ from sb3_contrib import MaskablePPO
 import wandb
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.callbacks import EvalCallback
+from sb3_contrib.common.maskable.callbacks import MaskableEvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
@@ -24,7 +25,7 @@ if __name__ == '__main__':
     psn = reader.read_psn(psn_path)
 
     # training environment
-    n_tr_envs = 20
+    n_tr_envs = 40
     tr_nsprs_per_ep = 1
     tr_load = 0.5
     tr_time_limit = False
@@ -157,7 +158,7 @@ if __name__ == '__main__':
     #     seed=12,
     # )
 
-    maskable_ppo = MaskablePPO(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cpu',
+    maskable_ppo = MaskablePPO(policy='MultiInputPolicy', env=tr_env, verbose=2, device='cuda:0',
         # policy_kwargs=ppo_policy_kwargs,
         policy_kwargs=dict(
             activation_fn=nn.Tanh,
@@ -174,14 +175,14 @@ if __name__ == '__main__':
         n_steps=1,
         gae_lambda=1.,
         n_epochs=1,
-        batch_size=20,  # n_steps * n_envs
+        batch_size=40,  # n_steps * n_envs
         normalize_advantage=False,
         clip_range_vf=None,
-        # tensorboard_log="../tb_logs/",
+        tensorboard_log="../tb_logs/",
         seed=12,)
 
     # define some training hyperparams
-    tot_tr_steps = 50_000_000
+    tot_tr_steps = 100_000_000
 
     if tr_reset_load_class is not None:
         tr_load = tr_reset_load_kwargs.get('cpu_load', None)
@@ -211,14 +212,14 @@ if __name__ == '__main__':
         **heu_kwargs,
     }
 
-    # wandb_run = wandb.init(
-    #     project="Masked actions",
-    #     dir="../",
-    #     name="Maskable PPO (same act (tanh), wax 50, load 0.5, 0.7 avail nodes)",
-    #     config=config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     save_code=True,  # optional
-    # )
+    wandb_run = wandb.init(
+        project="Masked actions",
+        dir="../",
+        name="Maskable PPO actual removal (same act (tanh), wax 50, load 0.5, 0.7 avail nodes) 100M steps, 40 envs",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        save_code=True,  # optional
+    )
 
     # training callbacks
     list_of_callbacks = [
@@ -241,14 +242,23 @@ if __name__ == '__main__':
         #               verbose=2,
         #               model_save_freq=10_000),
         
-        EvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
-                     eval_freq=5_000, deterministic=True, verbose=2,
-                     callback_after_eval=AcceptanceRatioByNSPRsCallback(
-                         env=eval_env,
-                         name="Eval acceptance ratio (by NSPRs)",
-                         nsprs_per_tr_phase=1,  # must be 1 for eval (default value)
-                         verbose=2
-                     )),
+        # EvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
+        #              eval_freq=1, deterministic=True, verbose=2,
+        #              callback_after_eval=AcceptanceRatioByNSPRsCallback(
+        #                  env=eval_env,
+        #                  name="Eval acceptance ratio (by NSPRs)",
+        #                  nsprs_per_tr_phase=1,  # must be 1 for eval (default value)
+        #                  verbose=2
+        #              )),
+        
+        MaskableEvalCallback(eval_env=eval_env, n_eval_episodes=1000, warn=True,
+                            eval_freq=5000, deterministic=True, verbose=2,
+                            callback_after_eval=AcceptanceRatioByNSPRsCallback(
+                                env=eval_env,
+                                name="Eval acceptance ratio (by NSPRs)",
+                                nsprs_per_tr_phase=1,  # must be 1 for eval (default value)
+                                verbose=2
+                            )),
 
         PSNLoadCallback(env=tr_env, freq=500, verbose=1),
 
@@ -272,4 +282,4 @@ if __name__ == '__main__':
                 log_interval=10,
                 callback=list_of_callbacks)
 
-    # wandb_run.finish()
+    wandb_run.finish()
