@@ -82,11 +82,13 @@ class DynamicConnectivity(gym.Wrapper):
                     unvisited.remove(u)
 
         # if the total bandwidth of the PSN hasn't been reached, reach it by adding random links
-        while self.placed_bw < self.tot_bw_cap:
+        perc_avail_nodes = self.env.perc_avail_nodes
+        tot_bw = self.tot_bw_cap * perc_avail_nodes     # cut tot bw proportionally to number of nodes
+        while self.placed_bw < tot_bw:
             u, v = random.sample(self.env.psn.nodes, 2)
             # check that the 2 nodes aren't connected already
             if (u, v) not in self.env.psn.edges:
-                bw = min(self.link_bw, self.tot_bw_cap - self.placed_bw)
+                bw = min(self.link_bw, tot_bw - self.placed_bw)
                 self.env.psn.add_edge(u, v, BWcap=bw, availBW=bw)
                 self.placed_bw += bw
                 # get the 2 nodes' indexes in the obs dict and update the obs dict
