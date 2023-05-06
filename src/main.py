@@ -63,8 +63,8 @@ if __name__ == '__main__':
             ),
             time_limit=tr_time_limit,
             time_limit_kwargs=dict(max_episode_steps=tr_max_ep_steps),
-            hadrl_nsprs=True,
-            hadrl_nsprs_kwargs=dict(
+            generate_nsprs=True,
+            nsprs_gen_kwargs=dict(
                 nsprs_per_ep=tr_nsprs_per_ep,
                 vnfs_per_nspr=5,
                 load=tr_load,

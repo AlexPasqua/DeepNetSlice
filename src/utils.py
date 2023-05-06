@@ -17,8 +17,8 @@ def make_env(
         time_limit_kwargs: Optional[dict] = None,
         reset_load_class: Type[gym.Wrapper] = None,
         reset_load_kwargs: Optional[dict] = None,
-        hadrl_nsprs: bool = False,
-        hadrl_nsprs_kwargs: Optional[dict] = None,
+        generate_nsprs: bool = False,
+        nsprs_gen_kwargs: Optional[dict] = None,
         placement_state: bool = True,
         dynamic_connectivity: bool = False,
         dynamic_connectivity_kwargs: Optional[dict] = dict(link_bw=10_000),
@@ -54,8 +54,8 @@ def make_env(
     # apply wrappers
     if time_limit:
         env = gym.wrappers.TimeLimit(env, **time_limit_kwargs)
-    if hadrl_nsprs:
-        env = NSPRsGeneratorHADRL(env, **hadrl_nsprs_kwargs)
+    if generate_nsprs:
+        env = NSPRsGeneratorHADRL(env, **nsprs_gen_kwargs)
     if dynamic_topology:
         env = ActionMasker(env, action_mask_fn=env.get_action_mask)
         env = DynamicConnectivity(env, nodes_mask=env.get_action_mask, **dynamic_connectivity_kwargs)
