@@ -1,9 +1,13 @@
-import reader
-from typing import Optional
+from typing import Optional, Type
 
 import gym
+from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
+from torch import nn
 
+import reader
+from policies.features_extractors.hadrl_features_extractor import \
+    GCNsFeaturesExtractor
 from utils import make_env
 
 
@@ -15,6 +19,7 @@ class Trainer:
         load_perc: float,
         time_limit: bool,
         max_ep_steps: int,
+        tenrorboard_log: str,
         reset_load_class: Optional[gym.Wrapper] = None,
         placement_state: bool = True,
         accumulate_rew: bool = True,
@@ -26,6 +31,16 @@ class Trainer:
         vnfs_per_nspr: int = 5,
         always_one: bool = True,
         seed: Optional[int] = None,
+        net_arch: dict = dict(pi=[256, 128], vf=[256, 128, 32]),
+        activation_fn: Type[nn.Module] = nn.Tanh,
+        gcn_layers_dims: tuple = (20, 20, 20),
+        device: str = 'cuda:0',
+        lr: float = 0.0002,
+        n_steps: int = 1,
+        gamma: float = 0.99,
+        ent_coef: float = 0.01,
+        gae_lambda: float = 0.92,
+        tot_tr_steps: int = 50_000_000,
     ):
         # checks on argumetns
         assert n_tr_envs > 0
@@ -61,3 +76,26 @@ class Trainer:
             ),
             seed=seed,
         )
+
+        model = A2C(policy='MultiInputPolicy', env=tr_env, verbose=2, device=device,
+                    learning_rate=lr,
+                    n_steps=n_steps,
+                    gamma=gamma,
+                    ent_coef=ent_coef,
+                    gae_lambda=gae_lambda,
+                    seed=seed,
+                    use_rms_prop=True,
+                    tensorboard_log=tenrorboard_log,
+                    policy_kwargs=dict(
+                        activation_fn=activation_fn,
+                        net_arch=net_arch,
+                        features_extractor_class=GCNsFeaturesExtractor,
+                        share_features_extractor=False,
+                        features_extractor_kwargs=dict(
+                            psn=psn,
+                            activation_fn=nn.ReLU,
+                            gcn_layers_dims=gcn_layers_dims,
+                        )
+                    ))
+
+        print(model.policy)

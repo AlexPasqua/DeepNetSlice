@@ -1,1 +1,1 @@
-from .hadrl_features_extractor import HADRLFeaturesExtractor
+from .hadrl_features_extractor import GCNsFeaturesExtractor

@@ -14,7 +14,7 @@ import torch as th
 import reader
 from callbacks import PSNLoadCallback, HParamCallback, AcceptanceRatioByNSPRsCallback, SeenNSPRsCallback
 from heuristic_layers import P2CLoadBalanceHeuristic
-from policies.features_extractors import HADRLFeaturesExtractor
+from policies.features_extractors import GCNsFeaturesExtractor
 from policies.hadrl_policy import HADRLPolicy
 from utils import make_env, create_HADRL_PSN_file, create_HEENSO_PSN_file
 from wrappers import ResetWithRealisticLoad, ResetWithLoadMixed
@@ -163,7 +163,7 @@ if __name__ == '__main__':
         policy_kwargs=dict(
             activation_fn=nn.Tanh,
             net_arch=dict(pi=[256, 128], vf=[256, 128, 32]),
-            features_extractor_class=HADRLFeaturesExtractor,
+            features_extractor_class=GCNsFeaturesExtractor,
             share_features_extractor=False,
             features_extractor_kwargs=dict(
                 psn=psn,
