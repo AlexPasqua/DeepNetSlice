@@ -11,7 +11,7 @@ from stable_baselines3.common.preprocessing import preprocess_obs
 from stable_baselines3.common.type_aliases import Schedule
 from torch import nn
 
-from .features_extractors import HADRLFeaturesExtractor
+from .features_extractors import GCNsFeaturesExtractor
 from .mlp_extractors.hadrl_mlp_extractor import HADRLActorCriticNet
 
 
@@ -72,11 +72,11 @@ class HADRLPolicy(MultiInputActorCriticPolicy):
             **kwargs,
         )
         # non-shared features extractors for the actor and the critic
-        self.policy_features_extractor = HADRLFeaturesExtractor(
+        self.policy_features_extractor = GCNsFeaturesExtractor(
             observation_space, psn, nn.Tanh, gcn_layers_dims,
             nspr_out_features
         )
-        self.value_features_extractor = HADRLFeaturesExtractor(
+        self.value_features_extractor = GCNsFeaturesExtractor(
             observation_space, psn, nn.ReLU, gcn_layers_dims,
             nspr_out_features
         )

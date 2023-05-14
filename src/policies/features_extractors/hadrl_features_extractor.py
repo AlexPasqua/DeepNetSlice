@@ -10,12 +10,7 @@ from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 
 
-class HADRLFeaturesExtractor(BaseFeaturesExtractor):
-    """
-    Features extractor network form HA-DRL paper:
-    https://ieeexplore.ieee.org/document/9632824
-    """
-
+class GCNsFeaturesExtractor(BaseFeaturesExtractor):
     def __init__(
             self,
             observation_space: gym.Space,
