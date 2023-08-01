@@ -53,6 +53,10 @@ These can also be created on the fly during training, with no need to read files
   - `demo.py`: contains a demo script.
 
 ## To cite
+**The paper is under review.**
+
+For now you can cite this Master's Thesis, which led to the development of what is now _DeepNetSlice_:
+
 ```
 @article{pasquali2023deep,
   title={Deep Reinforcement Learning for Network Slice Placement},
