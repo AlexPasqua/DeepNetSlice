@@ -52,6 +52,14 @@ These can also be created on the fly during training, with no need to read files
 
   - `demo.py`: contains a demo script.
 
+
+## Contributing
+Constributions are welcome! :rocket:
+
+To contribute:
+- If you want to **work on an open issue**, comment on that issue before opening a PR.
+- If you want to implement a **new feature** or an **improvement**, write about it in the Discussions tab.
+
 ## To cite
 **The paper is under review.**
 
