@@ -60,15 +60,9 @@ To contribute:
 - If you want to **work on an open issue**, comment on that issue before opening a PR.
 - If you want to implement a **new feature** or an **improvement**, write about it in the Discussions tab.
 
-## To cite
-**The paper is under review.**
-
-For now you can cite this Master's Thesis, which led to the development of what is now _DeepNetSlice_:
-
+## Reference
 ```
-@article{pasquali2023deep,
-  title={Deep Reinforcement Learning for Network Slice Placement},
-  author={PASQUALI, ALEX},
-  year={2023}
-}
+Alex Pasquali, Vincenzo Lomonaco, Davide Bacciu and Federica Paganelli,
+Deep Reinforcement Learning for Network Slice Placement and the DeepNetSlice Toolkit,
+IEEE International Conference on Machine Learning for Communication and Networking, ICMLCN 2024, 5-8 May 2024, Stockholm, Sweden
 ```
